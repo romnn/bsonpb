@@ -10,6 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// Version is incremented using bump2version
+const Version = "0.1.1"
+
 const secondInNanos = int32(time.Second / time.Nanosecond)
 const maxSecondsInDuration = 315576000000
 
