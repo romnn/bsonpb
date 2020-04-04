@@ -76,6 +76,15 @@ func (u *Unmarshaler) Unmarshal(data []byte, pb proto.Message) error {
 	return u.UnmarshalNext(pb)
 }
 
+// UnmarshalBSON unmarshals a BSON
+func (u *Unmarshaler) UnmarshalBSON(data bson.D, pb proto.Message) error {
+	raw, err := bson.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return u.Unmarshal(raw, pb)
+}
+
 // UnmarshalNext unmarshals the next protocol buffer from a BSON object stream.
 // This function is lenient and will decode any options permutations of the
 // related Marshaler.
@@ -89,6 +98,13 @@ func UnmarshalNext(dec *bson.Decoder, pb proto.Message) error {
 // permutations of the related Marshaler.
 func Unmarshal(data []byte, pb proto.Message) error {
 	return new(Unmarshaler).Unmarshal(data, pb)
+}
+
+// UnmarshalBSON unmarshals a BSON object stream into a protocol
+// buffer. This function is lenient and will decode any options
+// permutations of the related Marshaler.
+func UnmarshalBSON(data bson.D, pb proto.Message) error {
+	return new(Unmarshaler).UnmarshalBSON(data, pb)
 }
 
 func (u *Unmarshaler) unmarshalFromSafeString(v string, dest interface{}) error {
