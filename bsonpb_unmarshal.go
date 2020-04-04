@@ -40,8 +40,6 @@ type Unmarshaler struct {
 	// failing to unmarshal.
 	AllowUnknownFields bool
 
-	OmitDefaults bool
-
 	// A custom URL resolver to use when unmarshaling Any messages from BSON.
 	// If unset, the default resolution strategy is to extract the
 	// fully-qualified type name from the type URL and pass that to
