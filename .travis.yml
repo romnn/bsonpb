@@ -39,7 +39,7 @@ before_install:
   - chmod +x install.sh
   - ./install.sh --user
   - rm -f install.sh
-  
+
 install: true
 
 notifications:
@@ -48,4 +48,10 @@ notifications:
 script:
   - env GO111MODULE=on go build
   # Testing requires compiling protos so we use bazel for testing
-  - bazel test //:go_default_test --test_output=all
+  - bazel test //:go_default_test --test_output=all -coverprofile=coverage.txt -coverpkg=all -covermode=atomic
+  # Generate coverage report
+  - bazel coverage //:go_default_test
+  - cp ./bazel-testlogs/go_default_test/coverage.dat coverage.txt
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
