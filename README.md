@@ -1,5 +1,11 @@
 ## bsonpb
 
+[![Build Status](https://travis-ci.com/romnnn/bsonpb.svg?branch=master)](https://travis-ci.com/romnnn/bsonpb)
+[![GitHub](https://img.shields.io/github/license/romnnn/bsonpb)](https://github.com/romnnn/bsonpb)
+[![GoDoc](https://godoc.org/github.com/romnnn/bsonpb?status.svg)](https://godoc.org/github.com/romnnn/bsonpb)
+[![Test Coverage](https://codecov.io/gh/romnnn/bsonpb/branch/master/graph/badge.svg)](https://codecov.io/gh/romnnn/bsonpb)
+[![Release](https://img.shields.io/github/v/release/romnnn/bsonpb)](https://github.com/romnnn/bsonpb/releases/latest)
+
 This package allows to serialize/deserialize go `protobuf` messages into/from `bson` documents.
 
 It was inspired by the official [golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) package.
