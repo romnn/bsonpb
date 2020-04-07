@@ -33,13 +33,26 @@ type Marshaler struct {
 	OrigName bool
 
 	// Whether to use the original (.proto) name for fields.
-	OmitDefaults bool
+	Omit OmitOptions
 
 	// A custom URL resolver to use when marshaling Any messages to BSON.
 	// If unset, the default resolution strategy is to extract the
 	// fully-qualified type name from the type URL and pass that to
 	// proto.MessageType(string).
 	AnyResolver AnyResolver
+}
+
+// Whether to use the original (.proto) name for fields.
+type OmitOptions struct {
+    All bool
+    Bools bool
+	Ints bool
+	UInts bool
+	Floats bool
+	Strings bool
+	Maps bool
+	Pointers bool
+	Slices bool
 }
 
 // BSONPBMarshaler is implemented by protobuf messages that customize the
@@ -212,30 +225,38 @@ func (m *Marshaler) marshalObject(v proto.Message, typeURL string) (interface{},
 			}
 		}
 
-		if m.OmitDefaults {
+		if m.Omit != (OmitOptions{}) {
 			switch value.Kind() {
 			case reflect.Bool:
-				if !value.Bool() {
+				if !value.Bool() && (m.Omit.All || m.Omit.Bools)  {
 					continue
 				}
 			case reflect.Int32, reflect.Int64:
-				if value.Int() == 0 {
+				if value.Int() == 0 && (m.Omit.All || m.Omit.Ints) {
 					continue
 				}
 			case reflect.Uint32, reflect.Uint64:
-				if value.Uint() == 0 {
+				if value.Uint() == 0 && (m.Omit.All || m.Omit.UInts) {
 					continue
 				}
 			case reflect.Float32, reflect.Float64:
-				if value.Float() == 0 {
+				if value.Float() == 0 && (m.Omit.All || m.Omit.Floats) {
 					continue
 				}
 			case reflect.String:
-				if value.Len() == 0 {
+				if value.Len() == 0 && (m.Omit.All || m.Omit.Strings) {
 					continue
 				}
-			case reflect.Map, reflect.Ptr, reflect.Slice:
-				if value.IsNil() {
+			case reflect.Map:
+				if value.IsNil() && (m.Omit.All || m.Omit.Maps) {
+					continue
+				}
+			case reflect.Ptr:
+				if value.IsNil() && (m.Omit.All || m.Omit.Pointers) {
+					continue
+				}
+			case reflect.Slice:
+				if value.IsNil() && (m.Omit.All || m.Omit.Slices) {
 					continue
 				}
 			}
