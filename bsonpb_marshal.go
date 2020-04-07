@@ -44,15 +44,15 @@ type Marshaler struct {
 
 // Whether to use the original (.proto) name for fields.
 type OmitOptions struct {
-    All bool
-    Bools bool
-	Ints bool
-	UInts bool
-	Floats bool
-	Strings bool
-	Maps bool
+	All      bool
+	Bools    bool
+	Ints     bool
+	UInts    bool
+	Floats   bool
+	Strings  bool
+	Maps     bool
 	Pointers bool
-	Slices bool
+	Slices   bool
 }
 
 // BSONPBMarshaler is implemented by protobuf messages that customize the
@@ -228,7 +228,7 @@ func (m *Marshaler) marshalObject(v proto.Message, typeURL string) (interface{},
 		if m.Omit != (OmitOptions{}) {
 			switch value.Kind() {
 			case reflect.Bool:
-				if !value.Bool() && (m.Omit.All || m.Omit.Bools)  {
+				if !value.Bool() && (m.Omit.All || m.Omit.Bools) {
 					continue
 				}
 			case reflect.Int32, reflect.Int64:

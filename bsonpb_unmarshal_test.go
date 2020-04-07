@@ -493,7 +493,7 @@ func TestAnyWithCustomResolver(t *testing.T) {
 		Value:   msgBytes,
 	}
 
-	m := Marshaler{AnyResolver: resolver, OmitDefaults: true}
+	m := Marshaler{AnyResolver: resolver, Omit: OmitOptions{All: true}}
 	marshaled, err := m.Marshal(any)
 	if err != nil {
 		t.Errorf("an unexpected error occurred when marshaling any to BSON: %v", err)
