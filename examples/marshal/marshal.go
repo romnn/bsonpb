@@ -9,7 +9,7 @@ import (
 
 func main() {
 	marshaler := bsonpb.Marshaler{}
-	omitMarshaler := bsonpb.Marshaler{OmitDefaults: true}
+	omitMarshaler := bsonpb.Marshaler{Omit: bsonpb.OmitOptions{All: true}}
 
 	someProto := &pb.Widget{RColor: []pb.Widget_Color{pb.Widget_RED}}
 	fmt.Printf("----\nOriginal proto:\t\t\t %s\n", someProto)
