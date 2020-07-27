@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-	stpb "github.com/golang/protobuf/ptypes/struct"
+	"google.golang.org/protobuf/proto"
+	// "google.golang.org/protobuf/ptypes"
+	stpb "google.golang.org/protobuf/types/known/structpb"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/primitive"

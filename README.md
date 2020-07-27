@@ -8,7 +8,7 @@
 
 This package allows to serialize/deserialize go `protobuf` messages into/from `bson` documents.
 
-It was inspired by the official [golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) package.
+It was inspired by the official [golang/protobuf/jsonpb](https://google.golang.org/protobuf/tree/master/jsonpb) package.
 
 ```go
 import "github.com/romnnn/bsonbp"
@@ -63,4 +63,4 @@ bazel test //:unmarshal_test  # Unmarshalling tests only
 
 #### Acknowledgements
 
-- Authors of the [golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) package that was used as a starting point.
+- Authors of the [golang/protobuf/jsonpb](https://google.golang.org/protobuf/tree/master/jsonpb) package that was used as a starting point.
