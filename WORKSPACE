@@ -60,6 +60,7 @@ go_repository(
     version = "v0.0.0-20200304130557-0992d7d478a0",
 )
 
+# v1.3.4 is the last v1 version
 go_repository(
     name = "com_github_golang_protobuf",
     importpath = "github.com/golang/protobuf",

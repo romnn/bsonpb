@@ -16,7 +16,6 @@ go_library(
     deps = [
         "//test_protos:test_objects_go_proto",
         "@com_github_golang_protobuf//proto:go_default_library",
-        "@com_github_golang_protobuf//proto/proto3_proto:go_default_library",
         "@com_github_golang_protobuf//ptypes:go_default_library",
         "@com_github_golang_protobuf//ptypes/any:go_default_library",
         "@com_github_golang_protobuf//ptypes/duration:go_default_library",
@@ -27,7 +26,7 @@ go_library(
         "@org_mongodb_go_mongo_driver//bson:go_default_library",
         "@org_mongodb_go_mongo_driver//bson/bsonrw:go_default_library",
         "@org_mongodb_go_mongo_driver//bson/primitive:go_default_library",
-    ],
+    ]
 )
 
 go_test(
@@ -37,6 +36,9 @@ go_test(
         "bsonpb_test.go",
     ],
     embed = [":go_default_library"],
+    deps = [
+        "@com_github_golang_protobuf//proto/proto3_proto:go_default_library",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -47,6 +49,9 @@ go_test(
         "bsonpb_unmarshal_test.go",
     ],
     embed = [":go_default_library"],
+    deps = [
+        "@com_github_golang_protobuf//proto/proto3_proto:go_default_library",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -58,5 +63,8 @@ go_test(
         "bsonpb_unmarshal_test.go",
     ],
     embed = [":go_default_library"],
+    deps = [
+        "@com_github_golang_protobuf//proto/proto3_proto:go_default_library",
+    ],
     visibility = ["//visibility:public"],
 )
