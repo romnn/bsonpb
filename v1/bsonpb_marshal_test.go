@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	proto3pb "github.com/golang/protobuf/proto/proto3_proto"
+	proto3pb "github.com/golang/protobuf/internal/testprotos/proto3_proto"
 	"github.com/golang/protobuf/ptypes"
 	durpb "github.com/golang/protobuf/ptypes/duration"
 	stpb "github.com/golang/protobuf/ptypes/struct"
