@@ -7,29 +7,44 @@ package bsonpb
 import (
 	"encoding/base64"
 	"fmt"
+	"sort"
 	"errors"
 
 	// "google.golang.org/protobuf/internal/encoding/json"
 	"github.com/romnnn/bsonpb/v2/internal/json"
 	// "google.golang.org/protobuf/internal/encoding/messageset"
 	// "google.golang.org/protobuf/internal/errors"
-	// "google.golang.org/protobuf/internal/filedesc"
 	// "google.golang.org/protobuf/internal/flags"
 	// "google.golang.org/protobuf/internal/genid"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
-	// "google.golang.org/protobuf/internal/order"
-	"github.com/romnnn/bsonpb/v2/internal/order"
 	// "google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 const (
-	defaultIndent = "  "
 	protoLegacy = false
+	defaultIndent = "  "
+	ExtensionName = "message_set_extension"
 )
+
+// IsMessageSet returns whether the message uses the MessageSet wire format.
+func IsMessageSet(md pref.MessageDescriptor) bool {
+	xmd, ok := md.(interface{ IsMessageSet() bool })
+	return ok && xmd.IsMessageSet()
+}
+
+// IsMessageSetExtension reports this field extends a MessageSet.
+func IsMessageSetExtension(fd pref.FieldDescriptor) bool {
+	if fd.Name() != ExtensionName {
+		return false
+	}
+	if fd.FullName().Parent() != fd.Message().FullName() {
+		return false
+	}
+	return IsMessageSet(fd.ContainingMessage())
+}
 
 // Format formats the message as a multiline string.
 // This function is only intended for human consumption and ignores errors.
@@ -143,7 +158,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	}
 
 	enc := encoder{internalEnc, o}
-	if err := enc.marshalMessage(m.ProtoReflect(), ""); err != nil {
+	if err := enc.marshalMessage(m.ProtoReflect()); err != nil {
 		return nil, err
 	}
 	if o.AllowPartial {
@@ -152,248 +167,81 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	return enc.Bytes(), proto.CheckInitialized(m)
 }
 
-/*
-type (
-	File struct {
-		fileRaw
-		L1 FileL1
-
-		once uint32     // atomically set if L2 is valid
-		mu   sync.Mutex // protects L2
-		L2   *FileL2
-	}
-	FileL1 struct {
-		Syntax  pref.Syntax
-		Path    string
-		Package pref.FullName
-
-		Enums      Enums
-		Messages   Messages
-		Extensions Extensions
-		Services   Services
-	}
-	FileL2 struct {
-		Options   func() pref.ProtoMessage
-		Imports   FileImports
-		Locations SourceLocations
-	}
-)
-
-func (fd *File) ParentFile() pref.FileDescriptor { return fd }
-func (fd *File) Parent() pref.Descriptor         { return nil }
-func (fd *File) Index() int                      { return 0 }
-func (fd *File) Syntax() pref.Syntax             { return fd.L1.Syntax }
-func (fd *File) Name() pref.Name                 { return fd.L1.Package.Name() }
-func (fd *File) FullName() pref.FullName         { return fd.L1.Package }
-func (fd *File) IsPlaceholder() bool             { return false }
-func (fd *File) Options() pref.ProtoMessage {
-	if f := fd.lazyInit().Options; f != nil {
-		return f()
-	}
-	return descopts.File
-}
-func (fd *File) Path() string                          { return fd.L1.Path }
-func (fd *File) Package() pref.FullName                { return fd.L1.Package }
-func (fd *File) Imports() pref.FileImports             { return &fd.lazyInit().Imports }
-func (fd *File) Enums() pref.EnumDescriptors           { return &fd.L1.Enums }
-func (fd *File) Messages() pref.MessageDescriptors     { return &fd.L1.Messages }
-func (fd *File) Extensions() pref.ExtensionDescriptors { return &fd.L1.Extensions }
-func (fd *File) Services() pref.ServiceDescriptors     { return &fd.L1.Services }
-func (fd *File) SourceLocations() pref.SourceLocations { return &fd.lazyInit().Locations }
-func (fd *File) Format(s fmt.State, r rune)            { descfmt.FormatDesc(s, r, fd) }
-func (fd *File) ProtoType(pref.FileDescriptor)         {}
-func (fd *File) ProtoInternal(pragma.DoNotImplement)   {}
-
-func (fd *File) lazyInit() *FileL2 {
-	if atomic.LoadUint32(&fd.once) == 0 {
-		fd.lazyInitOnce()
-	}
-	return fd.L2
-}
-
-func (fd *File) lazyInitOnce() {
-	fd.mu.Lock()
-	if fd.L2 == nil {
-		fd.lazyRawInit() // recursively initializes all L2 structures
-	}
-	atomic.StoreUint32(&fd.once, 1)
-	fd.mu.Unlock()
-}
-
-// ProtoLegacyRawDesc is a pseudo-internal API for allowing the v1 code
-// to be able to retrieve the raw descriptor.
-//
-// WARNING: This method is exempt from the compatibility promise and may be
-// removed in the future without warning.
-func (fd *File) ProtoLegacyRawDesc() []byte {
-	return fd.builder.RawDescriptor
-}
-
-// GoPackagePath is a pseudo-internal API for determining the Go package path
-// that this file descriptor is declared in.
-//
-// WARNING: This method is exempt from the compatibility promise and may be
-// removed in the future without warning.
-func (fd *File) GoPackagePath() string {
-	return fd.builder.GoPackagePath
-}
-
-type Base struct {
-	L0 BaseL0
-}
-type BaseL0 struct {
-	FullName   pref.FullName // must be populated
-	ParentFile *File         // must be populated
-	Parent     pref.Descriptor
-	Index      int
-}
-
-func (d *Base) Name() pref.Name         { return d.L0.FullName.Name() }
-func (d *Base) FullName() pref.FullName { return d.L0.FullName }
-func (d *Base) ParentFile() pref.FileDescriptor {
-	if d.L0.ParentFile == SurrogateProto2 || d.L0.ParentFile == SurrogateProto3 {
-		return nil // surrogate files are not real parents
-	}
-	return d.L0.ParentFile
-}
-func (d *Base) Parent() pref.Descriptor             { return d.L0.Parent }
-func (d *Base) Index() int                          { return d.L0.Index }
-func (d *Base) Syntax() pref.Syntax                 { return d.L0.ParentFile.Syntax() }
-func (d *Base) IsPlaceholder() bool                 { return false }
-func (d *Base) ProtoInternal(pragma.DoNotImplement) {}
-
-type Field struct {
-	Base
-	L1 FieldL1
-}
-
-type FieldL1 struct {
-	Options          func() pref.ProtoMessage
-	Number           pref.FieldNumber
-	Cardinality      pref.Cardinality // must be consistent with Message.RequiredNumbers
-	Kind             pref.Kind
-	StringName       stringName
-	IsProto3Optional bool // promoted from google.protobuf.FieldDescriptorProto
-	IsWeak           bool // promoted from google.protobuf.FieldOptions
-	HasPacked        bool // promoted from google.protobuf.FieldOptions
-	IsPacked         bool // promoted from google.protobuf.FieldOptions
-	HasEnforceUTF8   bool // promoted from google.protobuf.FieldOptions
-	EnforceUTF8      bool // promoted from google.protobuf.FieldOptions
-	Default          defaultValue
-	ContainingOneof  pref.OneofDescriptor // must be consistent with Message.Oneofs.Fields
-	Enum             pref.EnumDescriptor
-	Message          pref.MessageDescriptor
-}
-*/
-
 type encoder struct {
 	*json.Encoder
 	opts MarshalOptions
 }
 
-// typeFieldDesc is a synthetic field descriptor used for the "@type" field.
-var typeFieldDesc = func() protoreflect.FieldDescriptor {
-	// TODO
-	var fd Field
-	fd.L0.FullName = "@type"
-	fd.L0.Index = -1
-	fd.L1.Cardinality = protoreflect.Optional
-	fd.L1.Kind = protoreflect.StringKind
-	/*
-	return &protoreflect.FieldDescriptor{
-		L0: struct{ FullName string; Index int }{ FullName: "@type", Index: -1 },
-		L1: struct{ Cardinality protoreflect.Cardinality; Kind protoreflect.Kind }{ Cardinality: protoreflect.Optional, Kind: protoreflect.StringKind },
-	}
-	*/
-}()
-
-// typeURLFieldRanger wraps a protoreflect.Message and modifies its Range method
-// to additionally iterate over a synthetic field for the type URL.
-type typeURLFieldRanger struct {
-	order.FieldRanger
-	typeURL string
-}
-
-func (m typeURLFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
-	if !f(typeFieldDesc, pref.ValueOfString(m.typeURL)) {
-		return
-	}
-	m.FieldRanger.Range(f)
-}
-
-// unpopulatedFieldRanger wraps a protoreflect.Message and modifies its Range
-// method to additionally iterate over unpopulated fields.
-type unpopulatedFieldRanger struct{ pref.Message }
-
-func (m unpopulatedFieldRanger) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
-	fds := m.Descriptor().Fields()
-	for i := 0; i < fds.Len(); i++ {
-		fd := fds.Get(i)
-		if m.Has(fd) || fd.ContainingOneof() != nil {
-			continue // ignore populated fields and fields within a oneofs
-		}
-
-		v := m.Get(fd)
-		isProto2Scalar := fd.Syntax() == pref.Proto2 && fd.Default().IsValid()
-		isSingularMessage := fd.Cardinality() != pref.Repeated && fd.Message() != nil
-		if isProto2Scalar || isSingularMessage {
-			v = pref.Value{} // use invalid value to emit null
-		}
-		if !f(fd, v) {
-			return
-		}
-	}
-	m.Message.Range(f)
-}
-
-// from https://github.com/protocolbuffers/protobuf-go/blob/master/internal/encoding/messageset/messageset.go
-// IsMessageSet returns whether the message uses the MessageSet wire format.
-func IsMessageSet(md pref.MessageDescriptor) bool {
-	xmd, ok := md.(interface{ IsMessageSet() bool })
-	return ok && xmd.IsMessageSet()
-}
-
-// marshalMessage marshals the fields in the given protoreflect.Message.
-// If the typeURL is non-empty, then a synthetic "@type" field is injected
-// containing the URL as the value.
-func (e encoder) marshalMessage(m pref.Message, typeURL string) error {
-	if !protoLegacy && IsMessageSet(m.Descriptor()) {
-		return errors.New("no support for proto1 MessageSets")
-	}
-
+// marshalMessage marshals the given protoreflect.Message.
+func (e encoder) marshalMessage(m pref.Message) error {
 	if marshal := wellKnownTypeMarshaler(m.Descriptor().FullName()); marshal != nil {
 		return marshal(e, m)
 	}
 
 	e.StartObject()
 	defer e.EndObject()
-
-	var fields FieldRanger = m
-	if e.opts.EmitUnpopulated {
-		fields = unpopulatedFieldRanger{m}
-	}
-	if typeURL != "" {
-		fields = typeURLFieldRanger{fields, typeURL}
+	if err := e.marshalFields(m); err != nil {
+		return err
 	}
 
-	var err error
-	RangeFields(fields, IndexNameFieldOrder, func(fd pref.FieldDescriptor, v pref.Value) bool {
+	return nil
+}
+
+// marshalFields marshals the fields in the given protoreflect.Message.
+func (e encoder) marshalFields(m pref.Message) error {
+	messageDesc := m.Descriptor()
+	if !protoLegacy && IsMessageSet(messageDesc) {
+		return errors.New("no support for proto1 MessageSets")
+	}
+
+	// Marshal out known fields.
+	fieldDescs := messageDesc.Fields()
+	for i := 0; i < fieldDescs.Len(); {
+		fd := fieldDescs.Get(i)
+		if od := fd.ContainingOneof(); od != nil {
+			fd = m.WhichOneof(od)
+			i += od.Fields().Len()
+			if fd == nil {
+				continue // unpopulated oneofs are not affected by EmitUnpopulated
+			}
+		} else {
+			i++
+		}
+
+		val := m.Get(fd)
+		if !m.Has(fd) {
+			if !e.opts.EmitUnpopulated {
+				continue
+			}
+			isProto2Scalar := fd.Syntax() == pref.Proto2 && fd.Default().IsValid()
+			isSingularMessage := fd.Cardinality() != pref.Repeated && fd.Message() != nil
+			if isProto2Scalar || isSingularMessage {
+				// Use invalid value to emit null.
+				val = pref.Value{}
+			}
+		}
+
 		name := fd.JSONName()
-		fmt.Printf("fd.JSONName()=%v\n", name)
 		if e.opts.UseProtoNames {
-			name = fd.TextName()
+			name = string(fd.Name())
+			// Use type name for group field name.
+			if fd.Kind() == pref.GroupKind {
+				name = string(fd.Message().Name())
+			}
 		}
+		if err := e.WriteName(name); err != nil {
+			return err
+		}
+		if err := e.marshalValue(val, fd); err != nil {
+			return err
+		}
+	}
 
-		if err = e.WriteName(name); err != nil {
-			return false
-		}
-		if err = e.marshalValue(v, fd); err != nil {
-			return false
-		}
-		fmt.Printf("e.marshalValue(v, fd)=%v\n", e.marshalValue(v, fd))
-		return true
-	})
-	return err
+	// Marshal out extensions.
+	if err := e.marshalExtensions(m); err != nil {
+		return err
+	}
+	return nil
 }
 
 // marshalValue marshals the given protoreflect.Value.
@@ -422,7 +270,7 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error 
 
 	case pref.StringKind:
 		if e.WriteString(val.String()) != nil {
-			return errors.New("Invalid UTF8: %s", string(fd.FullName()))
+			return fmt.Errorf("InvalidUTF8: %s", string(fd.FullName()))
 		}
 
 	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
@@ -460,7 +308,7 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error 
 		}
 
 	case pref.MessageKind, pref.GroupKind:
-		if err := e.marshalMessage(val.Message(), ""); err != nil {
+		if err := e.marshalMessage(val.Message()); err != nil {
 			return err
 		}
 
@@ -484,20 +332,98 @@ func (e encoder) marshalList(list pref.List, fd pref.FieldDescriptor) error {
 	return nil
 }
 
+type mapEntry struct {
+	key   pref.MapKey
+	value pref.Value
+}
+
 // marshalMap marshals given protoreflect.Map.
 func (e encoder) marshalMap(mmap pref.Map, fd pref.FieldDescriptor) error {
 	e.StartObject()
 	defer e.EndObject()
 
-	var err error
-	RangeEntries(mmap, GenericKeyOrder, func(k pref.MapKey, v pref.Value) bool {
-		if err = e.WriteName(k.String()); err != nil {
-			return false
-		}
-		if err = e.marshalSingular(v, fd.MapValue()); err != nil {
-			return false
-		}
+	// Get a sorted list based on keyType first.
+	entries := make([]mapEntry, 0, mmap.Len())
+	mmap.Range(func(key pref.MapKey, val pref.Value) bool {
+		entries = append(entries, mapEntry{key: key, value: val})
 		return true
 	})
-	return err
+	sortMap(fd.MapKey().Kind(), entries)
+
+	// Write out sorted list.
+	for _, entry := range entries {
+		if err := e.WriteName(entry.key.String()); err != nil {
+			return err
+		}
+		if err := e.marshalSingular(entry.value, fd.MapValue()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sortMap orders list based on value of key field for deterministic ordering.
+func sortMap(keyKind pref.Kind, values []mapEntry) {
+	sort.Slice(values, func(i, j int) bool {
+		switch keyKind {
+		case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind,
+			pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
+			return values[i].key.Int() < values[j].key.Int()
+
+		case pref.Uint32Kind, pref.Fixed32Kind,
+			pref.Uint64Kind, pref.Fixed64Kind:
+			return values[i].key.Uint() < values[j].key.Uint()
+		}
+		return values[i].key.String() < values[j].key.String()
+	})
+}
+
+// marshalExtensions marshals extension fields.
+func (e encoder) marshalExtensions(m pref.Message) error {
+	type entry struct {
+		key   string
+		value pref.Value
+		desc  pref.FieldDescriptor
+	}
+
+	// Get a sorted list based on field key first.
+	var entries []entry
+	m.Range(func(fd pref.FieldDescriptor, v pref.Value) bool {
+		if !fd.IsExtension() {
+			return true
+		}
+
+		// For MessageSet extensions, the name used is the parent message.
+		name := fd.FullName()
+		if IsMessageSetExtension(fd) {
+			name = name.Parent()
+		}
+
+		// Use [name] format for JSON field name.
+		entries = append(entries, entry{
+			key:   string(name),
+			value: v,
+			desc:  fd,
+		})
+		return true
+	})
+
+	// Sort extensions lexicographically.
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].key < entries[j].key
+	})
+
+	// Write out sorted list.
+	for _, entry := range entries {
+		// JSON field name is the proto field name enclosed in [], similar to
+		// textproto. This is consistent with Go v1 lib. C++ lib v3.7.0 does not
+		// marshal out extension fields.
+		if err := e.WriteName("[" + entry.key + "]"); err != nil {
+			return err
+		}
+		if err := e.marshalValue(entry.value, entry.desc); err != nil {
+			return err
+		}
+	}
+	return nil
 }
