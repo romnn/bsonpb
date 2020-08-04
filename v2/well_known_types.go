@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	// "errors"
 
 	// "google.golang.org/protobuf/internal/encoding/json"
 	"github.com/romnnn/bsonpb/v2/internal/json"
@@ -17,11 +18,16 @@ import (
 	// "google.golang.org/protobuf/internal/genid"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
 	// "google.golang.org/protobuf/internal/strs"
+	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/protobuf/proto"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
+	// "google.golang.org/protobuf/types/known/timestamppb"
+	// "google.golang.org/protobuf/types/known/durationpb"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type marshalFunc func(encoder, pref.Message) error
+// bson.D
+type marshalFunc func(encoder, pref.Message) (interface{}, error)
 
 // wellKnownTypeMarshaler returns a marshal function if the message type
 // has specialized serialization behavior. It returns nil otherwise.
@@ -103,39 +109,40 @@ func wellKnownTypeUnmarshaler(name pref.FullName) unmarshalFunc {
 // custom JSON representation, that representation will be embedded adding a
 // field `value` which holds the custom JSON in addition to the `@type` field.
 
-func (e encoder) marshalAny(m pref.Message) error {
+func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
+	result := bson.D{}
 	fds := m.Descriptor().Fields()
 	fdType := fds.ByNumber(genid.Any_TypeUrl_field_number)
 	fdValue := fds.ByNumber(genid.Any_Value_field_number)
 
-	// Start writing the JSON object.
-	e.StartObject()
-	defer e.EndObject()
-
 	if !m.Has(fdType) {
 		if !m.Has(fdValue) {
 			// If message is empty, marshal out empty JSON object.
-			return nil
-		} else {
-			// Return error if type_url field is not set, but value is set.
-			return fmt.Errorf("%s: %v is not set", genid.Any_message_fullname, genid.Any_TypeUrl_field_name)
+			return bson.D{}, nil
+			// return primitive.Null{}, nil
 		}
+		// Return error if type_url field is not set, but value is set.
+		return nil, fmt.Errorf("%s: %v is not set", genid.Any_message_fullname, genid.Any_TypeUrl_field_name)
 	}
 
 	typeVal := m.Get(fdType)
 	valueVal := m.Get(fdValue)
+	typeURL := typeVal.String()
 
 	// Marshal out @type field.
+	/*
 	typeURL := typeVal.String()
 	e.WriteName("@type")
 	if err := e.WriteString(typeURL); err != nil {
 		return err
 	}
+	*/
+	result = append(result, bson.E{Key: "@type", Value: typeURL})
 
 	// Resolve the type in order to unmarshal value field.
 	emt, err := e.opts.Resolver.FindMessageByURL(typeURL)
 	if err != nil {
-		return fmt.Errorf("%s: unable to resolve %q: %v", genid.Any_message_fullname, typeURL, err)
+		return result, fmt.Errorf("%s: unable to resolve %q: %v", genid.Any_message_fullname, typeURL, err)
 	}
 
 	em := emt.New()
@@ -144,23 +151,32 @@ func (e encoder) marshalAny(m pref.Message) error {
 		Resolver:     e.opts.Resolver,
 	}.Unmarshal(valueVal.Bytes(), em.Interface())
 	if err != nil {
-		return fmt.Errorf("%s: unable to unmarshal %q: %v", genid.Any_message_fullname, typeURL, err)
+		return result, fmt.Errorf("%s: unable to unmarshal %q: %v", genid.Any_message_fullname, typeURL, err)
 	}
 
 	// If type of value has custom JSON encoding, marshal out a field "value"
 	// with corresponding custom JSON encoding of the embedded message as a
 	// field.
 	if marshal := wellKnownTypeMarshaler(emt.Descriptor().FullName()); marshal != nil {
-		e.WriteName("value")
-		return marshal(e, em)
+		// e.WriteName("value")
+		// return marshal(e, em)
+		val, err := marshal(e, em)
+		if err != nil {
+			return result, err
+		}
+		result = append(result, bson.E{Key: "value", Value: val})
+		return result, nil
 	}
 
 	// Else, marshal out the embedded message's fields in this Any object.
-	if err := e.marshalFields(em); err != nil {
-		return err
+	marshaled, err := e.marshalFields(em)
+	if err != nil {
+		return result, err
 	}
 
-	return nil
+	result = append(result, marshaled...)
+	
+	return result, nil
 }
 
 func (d decoder) unmarshalAny(m pref.Message) error {
@@ -402,7 +418,7 @@ func (d decoder) unmarshalAnyValue(unmarshal unmarshalFunc, m pref.Message) erro
 
 // Wrapper types are encoded as JSON primitives like string, number or boolean.
 
-func (e encoder) marshalWrapperType(m pref.Message) error {
+func (e encoder) marshalWrapperType(m pref.Message) (interface{}, error) {
 	fd := m.Descriptor().Fields().ByNumber(genid.WrapperValue_Value_field_number)
 	val := m.Get(fd)
 	return e.marshalSingular(val, fd)
@@ -420,10 +436,8 @@ func (d decoder) unmarshalWrapperType(m pref.Message) error {
 
 // The JSON representation for Empty is an empty JSON object.
 
-func (e encoder) marshalEmpty(pref.Message) error {
-	e.StartObject()
-	e.EndObject()
-	return nil
+func (e encoder) marshalEmpty(pref.Message) (interface{}, error) {
+	return primitive.Null{}, nil
 }
 
 func (d decoder) unmarshalEmpty(pref.Message) error {
@@ -462,7 +476,7 @@ func (d decoder) unmarshalEmpty(pref.Message) error {
 // The JSON representation for Struct is a JSON object that contains the encoded
 // Struct.fields map and follows the serialization rules for a map.
 
-func (e encoder) marshalStruct(m pref.Message) error {
+func (e encoder) marshalStruct(m pref.Message) (interface{}, error) {
 	fd := m.Descriptor().Fields().ByNumber(genid.Struct_Fields_field_number)
 	return e.marshalMap(m.Get(fd).Map(), fd)
 }
@@ -476,7 +490,7 @@ func (d decoder) unmarshalStruct(m pref.Message) error {
 // ListValue.values repeated field and follows the serialization rules for a
 // repeated field.
 
-func (e encoder) marshalListValue(m pref.Message) error {
+func (e encoder) marshalListValue(m pref.Message) (interface{}, error) {
 	fd := m.Descriptor().Fields().ByNumber(genid.ListValue_Values_field_number)
 	return e.marshalList(m.Get(fd).List(), fd)
 }
@@ -490,11 +504,11 @@ func (d decoder) unmarshalListValue(m pref.Message) error {
 // set. Each of the field in the oneof has its own custom serialization rule. A
 // Value message needs to be a oneof field set, else it is an error.
 
-func (e encoder) marshalKnownValue(m pref.Message) error {
+func (e encoder) marshalKnownValue(m pref.Message) (interface{}, error) {
 	od := m.Descriptor().Oneofs().ByName(genid.Value_Kind_oneof_name)
 	fd := m.WhichOneof(od)
 	if fd == nil {
-		return fmt.Errorf("%s: none of the oneof fields is set", genid.Value_message_fullname)
+		return nil, fmt.Errorf("%s: none of the oneof fields is set", genid.Value_message_fullname)
 	}
 	return e.marshalSingular(m.Get(fd), fd)
 }
@@ -586,7 +600,7 @@ const (
 	maxSecondsInDuration = 315576000000
 )
 
-func (e encoder) marshalDuration(m pref.Message) error {
+func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	fds := m.Descriptor().Fields()
 	fdSeconds := fds.ByNumber(genid.Duration_Seconds_field_number)
 	fdNanos := fds.ByNumber(genid.Duration_Nanos_field_number)
@@ -595,15 +609,17 @@ func (e encoder) marshalDuration(m pref.Message) error {
 	nanosVal := m.Get(fdNanos)
 	secs := secsVal.Int()
 	nanos := nanosVal.Int()
+	
 	if secs < -maxSecondsInDuration || secs > maxSecondsInDuration {
-		return fmt.Errorf("%s: seconds out of range %v", genid.Duration_message_fullname, secs)
+		return bson.D{}, fmt.Errorf("%s: seconds out of range %v", genid.Duration_message_fullname, secs)
 	}
 	if nanos < -secondsInNanos || nanos > secondsInNanos {
-		return fmt.Errorf("%s: nanos out of range %v", genid.Duration_message_fullname, nanos)
+		return bson.D{}, fmt.Errorf("%s: nanos out of range %v", genid.Duration_message_fullname, nanos)
 	}
 	if (secs > 0 && nanos < 0) || (secs < 0 && nanos > 0) {
-		return fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
+		return bson.D{}, fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
 	}
+	/*
 	// Generated output always contains 0, 3, 6, or 9 fractional digits,
 	// depending on required precision, followed by the suffix "s".
 	f := "%d.%09d"
@@ -619,6 +635,42 @@ func (e encoder) marshalDuration(m pref.Message) error {
 	x = strings.TrimSuffix(x, ".000")
 	e.WriteString(x + "s")
 	return nil
+	*/
+	/*
+	dur, ok := m.Interface().(*durationpb.Duration)
+	if !ok {
+		return nil, errors.New("Not a duration")
+	}
+	*/
+	/*
+	if err := dur.CheckValid(); err != nil {
+		return nil, errors.New("Invalid duration")
+	}
+	return dur.AsDuration().Seconds(), nil
+	*/
+	return bson.D{
+		{Key: "Seconds", Value: secs},
+		{Key: "Nanos", Value: nanos},
+	}, nil
+	// return AsDuration(dur).Seconds(), nil
+	/*
+	sec, ns := sdur.Seconds, sdur.Nanos
+	if sec < -maxSecondsInDuration || sec > maxSecondsInDuration {
+		return nil, fmt.Errorf("seconds out of range %v", s)
+	}
+	if ns <= -secondInNanos || ns >= secondInNanos {
+		return nil, fmt.Errorf("ns out of range (%v, %v)", -secondInNanos, secondInNanos)
+	}
+	if (sec > 0 && ns < 0) || (sec < 0 && ns > 0) {
+		return nil, errors.New("signs of seconds and nanos do not match")
+	}
+	native, err := ptypes.Duration(sdur)
+	if err != nil {
+		return nil, err
+	}
+	converted := native.Seconds()
+	return converted, nil
+	*/
 }
 
 func (d decoder) unmarshalDuration(m pref.Message) error {
@@ -777,21 +829,23 @@ const (
 	minTimestampSeconds = -62135596800
 )
 
-func (e encoder) marshalTimestamp(m pref.Message) error {
+// primitive.DateTime
+func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	fds := m.Descriptor().Fields()
 	fdSeconds := fds.ByNumber(genid.Timestamp_Seconds_field_number)
 	fdNanos := fds.ByNumber(genid.Timestamp_Nanos_field_number)
 
 	secsVal := m.Get(fdSeconds)
 	nanosVal := m.Get(fdNanos)
-	secs := secsVal.Int()
-	nanos := nanosVal.Int()
+	secs := int64(secsVal.Int())
+	nanos := int64(nanosVal.Int())
 	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
-		return fmt.Errorf("%s: seconds out of range %v", genid.Timestamp_message_fullname, secs)
+		return bson.D{}, fmt.Errorf("%s: seconds out of range %v", genid.Timestamp_message_fullname, secs)
 	}
 	if nanos < 0 || nanos > secondsInNanos {
-		return fmt.Errorf("%s: nanos out of range %v", genid.Timestamp_message_fullname, nanos)
+		return bson.D{}, fmt.Errorf("%s: nanos out of range %v", genid.Timestamp_message_fullname, nanos)
 	}
+	/*
 	// Uses RFC 3339, where generated output will be Z-normalized and uses 0, 3,
 	// 6 or 9 fractional digits.
 	t := time.Unix(secs, nanos).UTC()
@@ -800,7 +854,20 @@ func (e encoder) marshalTimestamp(m pref.Message) error {
 	x = strings.TrimSuffix(x, "000")
 	x = strings.TrimSuffix(x, ".000")
 	e.WriteString(x + "Z")
-	return nil
+	*/
+	/* Convert proto timestamp to golang time.Time
+	vv, ok := m.Interface().(*timestamppb.Timestamp)
+	if !ok {
+		return bson.D{}, fmt.Errorf("Timestamp: Have %v but need a protobuf timestamp", m)
+	}
+	*/
+	/*
+	if err := vv.CheckValid(); err != nil {
+		return nil, errors.New("Invalid timestamp")
+	}
+	return primitive.NewDateTimeFromTime(vv.AsTime()), nil
+	*/
+	return primitive.NewDateTimeFromTime(time.Unix(secs, nanos).UTC()), nil
 }
 
 func (d decoder) unmarshalTimestamp(m pref.Message) error {
@@ -837,26 +904,26 @@ func (d decoder) unmarshalTimestamp(m pref.Message) error {
 // lower-camel naming conventions. Encoding should fail if the path name would
 // end up differently after a round-trip.
 
-func (e encoder) marshalFieldMask(m pref.Message) error {
+func (e encoder) marshalFieldMask(m pref.Message) (interface{}, error) {
 	fd := m.Descriptor().Fields().ByNumber(genid.FieldMask_Paths_field_number)
 	list := m.Get(fd).List()
-	paths := make([]string, 0, list.Len())
+	// paths := make([]bson.A, 0, list.Len())
+	paths := bson.A{}
 
 	for i := 0; i < list.Len(); i++ {
 		s := list.Get(i).String()
 		if !pref.FullName(s).IsValid() {
-			return fmt.Errorf("%s contains invalid path: %q", genid.FieldMask_Paths_field_fullname, s)
+			return nil, fmt.Errorf("%s contains invalid path: %q", genid.FieldMask_Paths_field_fullname, s)
 		}
 		// Return error if conversion to camelCase is not reversible.
 		cc := JSONCamelCase(s)
 		if s != JSONSnakeCase(cc) {
-			return fmt.Errorf("%s contains irreversible value %q", genid.FieldMask_Paths_field_fullname, s)
+			return nil, fmt.Errorf("%s contains irreversible value %q", genid.FieldMask_Paths_field_fullname, s)
 		}
 		paths = append(paths, cc)
-	}
-
-	e.WriteString(strings.Join(paths, ","))
-	return nil
+	}	
+	// e.WriteString(strings.Join(paths, ","))
+	return paths, nil
 }
 
 func (d decoder) unmarshalFieldMask(m pref.Message) error {

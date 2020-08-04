@@ -23,7 +23,7 @@ proto_library(
 
 go_proto_library(
     name = "test_proto2_go_proto",
-    importpath = "github.com/romnn/bsonpb/internal/testprotos/v2/bsonpb_proto2",
+    importpath = "github.com/romnnn/bsonpb/internal/testprotos/v2/bsonpb_proto2",
     proto = ":test_proto2_proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -37,7 +37,7 @@ go_proto_library(
 
 go_proto_library(
     name = "test_proto3_go_proto",
-    importpath = "github.com/romnn/bsonpb/internal/testprotos/v2/bsonpb_proto3",
+    importpath = "github.com/romnnn/bsonpb/internal/testprotos/v2/bsonpb_proto3",
     proto = ":test_proto3_proto",
     visibility = ["//visibility:public"],
     deps = [

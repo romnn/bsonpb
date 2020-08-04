@@ -1,23 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 http_archive(
-    name = "rules_proto_grpc",
-    urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/1.0.1.tar.gz"],
-    sha256 = "497225bb586e8f587e139c55b0f015e93bdddfd81902985ce24623528dbe31ab",
-    strip_prefix = "rules_proto_grpc-1.0.1",
-)
-
-load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains", "rules_proto_grpc_repos")
-
-rules_proto_grpc_toolchains()
-
-rules_proto_grpc_repos()
-
-load("@rules_proto_grpc//github.com/grpc/grpc-web:repositories.bzl", rules_proto_grpc_grpc_web_repos = "grpc_web_repos")
-
-rules_proto_grpc_grpc_web_repos()
-
-http_archive(
     name = "io_bazel_rules_go",
     sha256 = "8663604808d2738dc615a2c3eb70eba54a9a982089dd09f6ffe5d0e75771bc4f",
     urls = [
@@ -25,12 +8,6 @@ http_archive(
         "https://github.com/bazelbuild/rules_go/releases/download/v0.23.6/rules_go-v0.23.6.tar.gz",
     ],
 )
-
-load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_toolchains")
-
-go_rules_dependencies()
-
-go_register_toolchains()
 
 http_archive(
     name = "bazel_gazelle",
@@ -41,9 +18,62 @@ http_archive(
     ],
 )
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+http_archive(
+    name = "com_google_protobuf",
+    # sha256 = "c5dc4cacbb303d5d0aa20c5cbb5cb88ef82ac61641c951cdf6b8e054184c5e22",
+    strip_prefix = "protobuf-3.11.4",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.11.4.zip"],
+)
 
-gazelle_dependencies()
+"""
+http_archive(
+    name = "com_google_protobuf",
+    sha256 = "0075c64cef80524b1d855df5f405845ded9b8d055022cc17b94e1589eb946b90",
+    strip_prefix = "protobuf-4.0.0-rc2",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v4.0.0-rc2.zip"],
+)
+"""
+
+load("@io_bazel_rules_go//go:deps.bzl", "go_rules_dependencies", "go_register_toolchains")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+# Override the dependencies here!
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+
+"""
+go_repository(
+    name = "org_golang_google_protobuf",
+    importpath = "google.golang.org/protobuf",
+    sum = "h1:Ejskq+SyPohKW+1uil0JJMtmHCgJPJ/qWTxr8qp+R4c=",
+    version = "v1.25.0",
+)
+"""
+
+"""
+go_repository(
+    name = "com_github_golang_protobuf",
+    build_file_proto_mode = "disable_global",
+    importpath = "github.com/golang/protobuf",
+    patch_args = ["-p1"],
+    patches = ["@io_bazel_rules_go//third_party:com_github_golang_protobuf-extras.patch"],
+    sum = "h1:87PNWwrRvUSnqS4dlcBU/ftvOIBep4sYuBLlh6rX2wk=",
+    version = "v1.3.4",
+)
+"""
+
+go_repository(
+    name = "org_golang_google_genproto",
+    importpath = "google.golang.org/genproto",
+    sum = "h1:wTk5DQB3+1darAz4Ldomo0r5bUOCKX7gilxQ4sb2kno=",
+    version = "v0.0.0-20200731012542-8145dea6a485",
+)
+
+protobuf_deps()
+
+go_rules_dependencies()
+
+go_register_toolchains()
 
 gazelle_dependencies()
 
@@ -69,15 +99,22 @@ go_repository(
 )
 
 go_repository(
-    name = "com_github_golang_protobuf",
-    importpath = "github.com/golang/protobuf",
-    sum = "h1:+Z5KGCizgyZCbGh1KZqA0fcLLkwbsjIzS4aV2v7wJX0=",
-    version = "v1.3.4",
+    name = "com_github_sirupsen_logrus",
+    importpath = "github.com/sirupsen/logrus",
+    sum = "h1:UBcNElsrwanuuMsnGSlYmtmgbb23qDR5dG+6X6Oo89I=",
+    version = "v1.6.0",
+)
+
+go_repository(
+    name = "com_github_google_go_cmp",
+    importpath = "github.com/google/go-cmp",
+    sum = "h1:JFrFEBb2xKufg6XkJsJr+WbKb4FQlURi5RUcBveYu9k=",
+    version = "v0.5.1",
 )
 
 go_repository(
     name = "org_golang_google_protobuf",
     importpath = "google.golang.org/protobuf",
-    sum = "h1:Ejskq+SyPohKW+1uil0JJMtmHCgJPJ/qWTxr8qp+R4c=",
-    version = "v1.25.0",
+    sum = "h1:UhZDfRO8JRQru4/+LlLE0BRKGF8L+PICnvYZmx/fEGA=",
+    version = "v1.24.0",
 )

@@ -4,6 +4,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 # gazelle:prefix github.com/romnnn/bsonpb
 gazelle(name = "gazelle")
 
+# gazelle:go_proto_compilers //:go_proto_apiv2
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -11,7 +13,7 @@ go_library(
         "bsonpb_marshal.go",
         "bsonpb_unmarshal.go",
     ],
-    importpath = "github.com/romnnn/bsonpb",
+    importpath = "github.com/romnnn/bsonpb/v1",
     visibility = ["//visibility:public"],
     deps = [
         "//test_protos:test_objects_go_proto",

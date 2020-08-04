@@ -7,17 +7,21 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_protobuf//:any_proto",
-        "//internal/test_protos/v2/proto2_proto:test_proto",
+        "@com_google_protobuf//:empty_proto",
+        "@com_google_protobuf//:field_mask_proto",
+        "@com_google_protobuf//:duration_proto",
+        "@com_google_protobuf//:struct_proto",
+        "@com_google_protobuf//:timestamp_proto",
+        "@com_google_protobuf//:wrappers_proto",
     ],
 )
 
 go_proto_library(
     name = "test_go_proto",
-    importpath = "github.com/romnnn/bsonpb/internal/testprotos/v2/proto3_proto",
+    importpath = "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb2_proto",
     proto = ":test_proto",
     visibility = ["//visibility:public"],
     deps = [
-        "//internal/test_protos/v2/proto2_proto:test_go_proto",
-        "@com_github_golang_protobuf//ptypes/any:go_default_library",
+        
     ],
 )
