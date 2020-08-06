@@ -118,3 +118,10 @@ go_repository(
     sum = "h1:UhZDfRO8JRQru4/+LlLE0BRKGF8L+PICnvYZmx/fEGA=",
     version = "v1.24.0",
 )
+
+go_repository(
+    name = "com_github_lunemec_as",
+    importpath = "github.com/lunemec/as",
+    sum = "h1:76CLvdcM2GTl7908l53dswTjxj777jul1l/YCwK4eX8=",
+    version = "v1.0.0",
+)

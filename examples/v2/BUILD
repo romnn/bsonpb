@@ -12,5 +12,6 @@ go_binary(
         "@org_mongodb_go_mongo_driver//bson:go_default_library",
         "@com_github_sirupsen_logrus//:go_default_library",
         "@org_golang_google_protobuf//types/known/timestamppb:go_default_library",
+        "@org_golang_google_protobuf//types/known/wrapperspb:go_default_library",
     ],
 )

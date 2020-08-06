@@ -8,12 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"reflect"
+	"unicode/utf8"
 	"strings"
 	"time"
-	// "errors"
+	"errors"
 
 	// "google.golang.org/protobuf/internal/encoding/json"
-	"github.com/romnnn/bsonpb/v2/internal/json"
+	// "github.com/romnnn/bsonpb/v2/internal/json"
 	// "google.golang.org/protobuf/internal/errors"
 	// "google.golang.org/protobuf/internal/genid"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
@@ -65,11 +67,12 @@ func wellKnownTypeMarshaler(name pref.FullName) marshalFunc {
 	return nil
 }
 
-type unmarshalFunc func(decoder, pref.Message) error
+type unmarshalFunc func(decoder, interface{}, pref.Message) error
 
 // wellKnownTypeUnmarshaler returns a unmarshal function if the message type
 // has specialized serialization behavior. It returns nil otherwise.
 func wellKnownTypeUnmarshaler(name pref.FullName) unmarshalFunc {
+	// fmt.Printf("name=%s vs. %s", name.Name(), genid.BoolValue_message_name)
 	if name.Parent() == genid.GoogleProtobuf_package {
 		switch name.Name() {
 		case genid.Any_message_name:
@@ -94,8 +97,8 @@ func wellKnownTypeUnmarshaler(name pref.FullName) unmarshalFunc {
 			return decoder.unmarshalListValue
 		case genid.Value_message_name:
 			return decoder.unmarshalKnownValue
-		case genid.FieldMask_message_name:
-			return decoder.unmarshalFieldMask
+		//case genid.FieldMask_message_name:
+		//	return decoder.unmarshalFieldMask
 		case genid.Empty_message_name:
 			return decoder.unmarshalEmpty
 		}
@@ -179,8 +182,128 @@ func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
 	return result, nil
 }
 
-func (d decoder) unmarshalAny(m pref.Message) error {
-	// Peek to check for json.ObjectOpen to avoid advancing a read.
+func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
+	// Use another decoder to parse the unread bytes for @type field. This
+	// avoids advancing a read from current decoder because the current JSON
+	// object may contain the fields of the embedded type.
+	// dec := decoder{}
+	
+	valD := val.(bson.D)
+	/*
+	tok, found := valD.Map()["@type"]
+	if len(valD) < 1 {
+		return nil
+	}
+	*/
+	// Check for duplicate @type field
+	var found, nonEmpty, ok bool
+	var typeURL string
+	for _, item := range valD {
+		switch item.Key {
+		case "@type":
+			nonEmpty = true
+			if found {
+				// Duplicate
+				return errors.New("duplicate @type field")
+			}
+			typeURL, ok = item.Value.(string)
+			if !ok || typeURL == "" {
+				return errors.New("@type field contains empty or invalid value")
+			}
+			found = true
+		case "value":
+			nonEmpty = true
+		default:
+			if !d.opts.DiscardUnknown {
+				nonEmpty = true
+			}
+		}
+	}
+	if !nonEmpty || (!found && d.opts.DiscardUnknown) {
+		return nil
+	}
+	if !found {
+		return errors.New("missing @type field in non-empty message")
+	}
+
+	fmt.Printf("unmarshalAny %v (typeURL=%s)\n", val, typeURL)
+	emt, err := d.opts.Resolver.FindMessageByURL(typeURL)
+	if err != nil {
+		return fmt.Errorf("unable to resolve %q: %s", typeURL, strings.Replace(err.Error(), "\u00a0", " ", -1))
+	}
+
+	// Create new message for the embedded message type and unmarshal into it.
+	em := emt.New()
+	if umFunc := wellKnownTypeUnmarshaler(emt.Descriptor().FullName()); umFunc != nil {
+		// If embedded message is a custom type,
+		// unmarshal the JSON "value" field into it.
+		if err := d.unmarshalAnyValue(valD, umFunc, em); err != nil {
+			return err
+		}
+	} else {
+		// Else unmarshal the current JSON object into it.
+		// Remove the type first
+		valDNoType := bson.D{}
+		for _, item := range valD {
+			if item.Key != "@type" {
+				valDNoType = append(valDNoType, item)
+			}
+		}
+		if err := d.unmarshalMessage(valDNoType, em, true); err != nil {
+			return err
+		}
+	}
+	// Serialize the embedded message and assign the resulting bytes to the
+	// proto value field.
+	b, err := proto.MarshalOptions{
+		AllowPartial:  true, // No need to check required fields inside an Any.
+		Deterministic: true,
+	}.Marshal(em.Interface())
+	if err != nil {
+		return fmt.Errorf("error in marshaling Any.value field: %v", err)
+	}
+
+	fds := m.Descriptor().Fields()
+	fdType := fds.ByNumber(genid.Any_TypeUrl_field_number)
+	fdValue := fds.ByNumber(genid.Any_Value_field_number)
+
+	m.Set(fdType, pref.ValueOfString(typeURL))
+	m.Set(fdValue, pref.ValueOfBytes(b))
+	return nil
+}
+
+func (d decoder) unmarshalAnyValue(val bson.D, umFunc unmarshalFunc, m pref.Message) error {
+	// fmt.Printf("unmarshalMessage: %v => %v\n", doc, m.Descriptor().FullName())
+	var found bool
+	for _, item := range val {
+		switch item.Key {
+		case "@type":
+			// Skip the value as this was previously parsed already.
+		case "value":
+			if found {
+				return fmt.Errorf(`duplicate "value" field`)
+			}
+			// Unmarshal the field value into the given message.
+			if err := umFunc(d, item.Value, m); err != nil {
+				return err
+			}
+			found = true
+		default:
+			if d.opts.DiscardUnknown {
+				continue
+			}
+			return fmt.Errorf("unknown field %q", item.Key)
+		}
+	}
+	if !found {
+		return fmt.Errorf(`missing "value" field`)
+	}
+	return nil
+}
+
+/*
+func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
+	/* Peek to check for json.ObjectOpen to avoid advancing a read.
 	start, err := d.Peek()
 	if err != nil {
 		return err
@@ -253,10 +376,12 @@ func (d decoder) unmarshalAny(m pref.Message) error {
 	m.Set(fdValue, pref.ValueOfBytes(b))
 	return nil
 }
+*/
 
 var errEmptyObject = fmt.Errorf(`empty object`)
 var errMissingType = fmt.Errorf(`missing "@type" field`)
 
+/*
 // findTypeURL returns the token for the "@type" field value from the given
 // JSON bytes. It is expected that the given bytes start with json.ObjectOpen.
 // It returns errEmptyObject if the JSON object is empty or errMissingType if
@@ -415,6 +540,7 @@ func (d decoder) unmarshalAnyValue(unmarshal unmarshalFunc, m pref.Message) erro
 		}
 	}
 }
+*/
 
 // Wrapper types are encoded as JSON primitives like string, number or boolean.
 
@@ -424,13 +550,13 @@ func (e encoder) marshalWrapperType(m pref.Message) (interface{}, error) {
 	return e.marshalSingular(val, fd)
 }
 
-func (d decoder) unmarshalWrapperType(m pref.Message) error {
+func (d decoder) unmarshalWrapperType(val interface{}, m pref.Message) error {
 	fd := m.Descriptor().Fields().ByNumber(genid.WrapperValue_Value_field_number)
-	val, err := d.unmarshalScalar(fd)
+	marshaled, err := d.unmarshalScalar(val, fd)
 	if err != nil {
 		return err
 	}
-	m.Set(fd, val)
+	m.Set(fd, marshaled)
 	return nil
 }
 
@@ -440,6 +566,19 @@ func (e encoder) marshalEmpty(pref.Message) (interface{}, error) {
 	return primitive.Null{}, nil
 }
 
+func (d decoder) unmarshalEmpty(val interface{}, m pref.Message) error {
+	if valD, ok := val.(bson.D); ok {
+		for _, item := range valD {
+			if d.opts.DiscardUnknown {
+				continue
+			}
+			return fmt.Errorf("unknown field %q", item.Key)
+		}
+	}
+	return nil
+}
+
+/*
 func (d decoder) unmarshalEmpty(pref.Message) error {
 	tok, err := d.Read()
 	if err != nil {
@@ -472,6 +611,7 @@ func (d decoder) unmarshalEmpty(pref.Message) error {
 		}
 	}
 }
+*/
 
 // The JSON representation for Struct is a JSON object that contains the encoded
 // Struct.fields map and follows the serialization rules for a map.
@@ -481,9 +621,10 @@ func (e encoder) marshalStruct(m pref.Message) (interface{}, error) {
 	return e.marshalMap(m.Get(fd).Map(), fd)
 }
 
-func (d decoder) unmarshalStruct(m pref.Message) error {
+func (d decoder) unmarshalStruct(val interface{}, m pref.Message) error {
 	fd := m.Descriptor().Fields().ByNumber(genid.Struct_Fields_field_number)
-	return d.unmarshalMap(m.Mutable(fd).Map(), fd)
+	fmt.Printf("unmarshalStruct %v (fd=%v)", val, fd)
+	return d.unmarshalMap(val.(bson.D), m.Mutable(fd).Map(), fd)
 }
 
 // The JSON representation for ListValue is JSON array that contains the encoded
@@ -495,9 +636,9 @@ func (e encoder) marshalListValue(m pref.Message) (interface{}, error) {
 	return e.marshalList(m.Get(fd).List(), fd)
 }
 
-func (d decoder) unmarshalListValue(m pref.Message) error {
+func (d decoder) unmarshalListValue(val interface{}, m pref.Message) error {
 	fd := m.Descriptor().Fields().ByNumber(genid.ListValue_Values_field_number)
-	return d.unmarshalList(m.Mutable(fd).List(), fd)
+	return d.unmarshalList(val.(bson.A), m.Mutable(fd).List(), fd)
 }
 
 // The JSON representation for a Value is dependent on the oneof field that is
@@ -513,6 +654,94 @@ func (e encoder) marshalKnownValue(m pref.Message) (interface{}, error) {
 	return e.marshalSingular(m.Get(fd), fd)
 }
 
+func (d decoder) unmarshalKnownValue(val interface{}, m pref.Message) error {
+	fmt.Printf("Kind for %v (%T) is: %v\n", val, val, reflect.TypeOf(val).Kind())
+
+	var fd pref.FieldDescriptor
+	var pval pref.Value
+	valT := reflect.TypeOf(val)
+	valV := reflect.ValueOf(val)
+	switch valT.Kind() {
+	case reflect.Bool:
+		fd = m.Descriptor().Fields().ByNumber(genid.Value_BoolValue_field_number)
+		pval = pref.ValueOfBool(valV.Bool())
+
+	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64:
+		fd = m.Descriptor().Fields().ByNumber(genid.Value_NumberValue_field_number)
+		// var ok bool
+		// unmarshalFloat(tok, 64)
+		pval = pref.ValueOfFloat64(float64(valV.Int()))
+	case reflect.Float32, reflect.Float64:
+		fd = m.Descriptor().Fields().ByNumber(genid.Value_NumberValue_field_number)
+		// var ok bool
+		// unmarshalFloat(tok, 64)
+		pval = pref.ValueOfFloat64(valV.Float())
+		/*
+		if !ok {
+			return fmt.Errorf"invalid %v: %v", genid.Value_message_fullname, val)
+		}
+		*/
+
+	case reflect.String:
+		// A JSON string may have been encoded from the number_value field,
+		// e.g. "NaN", "Infinity", etc. Parsing a proto double type also allows
+		// for it to be in JSON string form. Given this custom encoding spec,
+		// however, there is no way to identify that and hence a JSON string is
+		// always assigned to the string_value field, which means that certain
+		// encoding cannot be parsed back to the same field.
+		fd = m.Descriptor().Fields().ByNumber(genid.Value_StringValue_field_number)
+		if valid := utf8.Valid([]byte(valV.String())); !valid {
+			return fmt.Errorf("invalid UTF-8: %s", valV.String())
+		}
+		pval = pref.ValueOfString(valV.String())
+
+	case reflect.Struct:
+		// Check for null
+		if _, null := val.(primitive.Null); null {
+			fd = m.Descriptor().Fields().ByNumber(genid.Value_NullValue_field_number)
+			pval = pref.ValueOfEnum(0)
+		} else {
+			fd = m.Descriptor().Fields().ByNumber(genid.Value_StructValue_field_number)
+			pval = m.NewField(fd)
+			if err := d.unmarshalStruct(val, pval.Message()); err != nil {
+				return err
+			}
+		}
+
+	case reflect.Array, reflect.Slice:
+		// Can be either .D or .A?
+		if _, isD := val.(bson.D); isD {
+			fd = m.Descriptor().Fields().ByNumber(genid.Value_StructValue_field_number)
+			pval = m.NewField(fd)
+			if err := d.unmarshalStruct(val, pval.Message()); err != nil {
+				return err
+			}
+		}
+		if _, isA := val.(bson.A); isA {
+			fd = m.Descriptor().Fields().ByNumber(genid.Value_ListValue_field_number)
+			pval = m.NewField(fd)
+			if err := d.unmarshalListValue(val, pval.Message()); err != nil {
+				return err
+			}
+		}
+
+	default:
+		return fmt.Errorf("invalid %v: %v", genid.Value_message_fullname, val)
+	}
+	m.Set(fd, pval)
+	return nil
+}
+
+/*
 func (d decoder) unmarshalKnownValue(m pref.Message) error {
 	tok, err := d.Peek()
 	if err != nil {
@@ -582,6 +811,7 @@ func (d decoder) unmarshalKnownValue(m pref.Message) error {
 	m.Set(fd, val)
 	return nil
 }
+*/
 
 // The JSON representation for a Duration is a JSON string that ends in the
 // suffix "s" (indicating seconds) and is preceded by the number of seconds,
@@ -600,6 +830,19 @@ const (
 	maxSecondsInDuration = 315576000000
 )
 
+func isValidDuration(secs, nanos int64) (bool, error) {
+	if secs < -maxSecondsInDuration || secs > maxSecondsInDuration {
+		return false, fmt.Errorf("%s: seconds out of range %v", genid.Duration_message_fullname, secs)
+	}
+	if nanos < -secondsInNanos || nanos > secondsInNanos {
+		return false, fmt.Errorf("%s: nanos out of range %v", genid.Duration_message_fullname, nanos)
+	}
+	if (secs > 0 && nanos < 0) || (secs < 0 && nanos > 0) {
+		return false,  fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
+	}
+	return true, nil
+}
+
 func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	fds := m.Descriptor().Fields()
 	fdSeconds := fds.ByNumber(genid.Duration_Seconds_field_number)
@@ -610,14 +853,8 @@ func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	secs := secsVal.Int()
 	nanos := nanosVal.Int()
 	
-	if secs < -maxSecondsInDuration || secs > maxSecondsInDuration {
-		return bson.D{}, fmt.Errorf("%s: seconds out of range %v", genid.Duration_message_fullname, secs)
-	}
-	if nanos < -secondsInNanos || nanos > secondsInNanos {
-		return bson.D{}, fmt.Errorf("%s: nanos out of range %v", genid.Duration_message_fullname, nanos)
-	}
-	if (secs > 0 && nanos < 0) || (secs < 0 && nanos > 0) {
-		return bson.D{}, fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
+	if _, err := isValidDuration(secs, nanos); err != nil {
+		return bson.D{}, err
 	}
 	/*
 	// Generated output always contains 0, 3, 6, or 9 fractional digits,
@@ -673,6 +910,48 @@ func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	*/
 }
 
+func (d decoder) unmarshalDuration(val interface{}, m pref.Message) error {
+	var err = fmt.Errorf("invalid google.protobuf.Duration value %s", quoted(val))
+	dur, ok := val.(bson.D)
+	if !ok {
+		return err
+	}
+	fds := m.Descriptor().Fields()
+	fdSeconds := fds.ByNumber(genid.Duration_Seconds_field_number)
+	fdNanos := fds.ByNumber(genid.Duration_Nanos_field_number)
+
+	var secs, nanos int64
+	if seconds, ok := dur.Map()["Seconds"]; ok {
+		switch reflect.TypeOf(seconds).Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				secs = reflect.ValueOf(seconds).Int()
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				secs = int64(reflect.ValueOf(seconds).Uint())
+			default:
+				return fmt.Errorf("invalid google.protobuf.Duration seconds: %v (want int64 but got %T)", quoted(seconds), seconds)
+		}
+	}
+	if nanoseconds, ok := dur.Map()["Nanos"]; ok {
+		switch reflect.TypeOf(nanoseconds).Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				nanos = int64(reflect.ValueOf(nanoseconds).Int())
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				nanos = int64(reflect.ValueOf(nanoseconds).Uint())
+			default:
+				return fmt.Errorf("invalid google.protobuf.Duration nanoseconds: %v (want int32 but got %T)", quoted(nanoseconds), nanoseconds)
+		}
+	}
+
+	if _, err := isValidDuration(secs, nanos); err != nil {
+		return err
+	}
+
+	m.Set(fdSeconds, pref.ValueOfInt64(secs))
+	m.Set(fdNanos, pref.ValueOfInt32(int32(nanos)))
+	return nil
+}
+
+/*
 func (d decoder) unmarshalDuration(m pref.Message) error {
 	tok, err := d.Read()
 	if err != nil {
@@ -700,6 +979,7 @@ func (d decoder) unmarshalDuration(m pref.Message) error {
 	m.Set(fdNanos, pref.ValueOfInt32(nanos))
 	return nil
 }
+*/
 
 // parseDuration parses the given input string for seconds and nanoseconds value
 // for the Duration JSON format. The format is a decimal number with a suffix
@@ -829,7 +1109,16 @@ const (
 	minTimestampSeconds = -62135596800
 )
 
-// primitive.DateTime
+func isValidTimestamp(secs, nanos int64) (bool, error) {
+	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
+		return false, fmt.Errorf("%s: seconds out of range %v", genid.Timestamp_message_fullname, secs)
+	}
+	if nanos < 0 || nanos > secondsInNanos {
+		return false, fmt.Errorf("%s: nanos out of range %v", genid.Timestamp_message_fullname, nanos)
+	}
+	return true, nil
+}
+
 func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	fds := m.Descriptor().Fields()
 	fdSeconds := fds.ByNumber(genid.Timestamp_Seconds_field_number)
@@ -839,11 +1128,9 @@ func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	nanosVal := m.Get(fdNanos)
 	secs := int64(secsVal.Int())
 	nanos := int64(nanosVal.Int())
-	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
-		return bson.D{}, fmt.Errorf("%s: seconds out of range %v", genid.Timestamp_message_fullname, secs)
-	}
-	if nanos < 0 || nanos > secondsInNanos {
-		return bson.D{}, fmt.Errorf("%s: nanos out of range %v", genid.Timestamp_message_fullname, nanos)
+	
+	if _, err := isValidTimestamp(secs, nanos); err != nil {
+		return bson.D{}, err
 	}
 	/*
 	// Uses RFC 3339, where generated output will be Z-normalized and uses 0, 3,
@@ -870,6 +1157,34 @@ func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	return primitive.NewDateTimeFromTime(time.Unix(secs, nanos).UTC()), nil
 }
 
+func (d decoder) unmarshalTimestamp(val interface{}, m pref.Message) error {
+	fds := m.Descriptor().Fields()
+	fdSeconds := fds.ByNumber(genid.Timestamp_Seconds_field_number)
+	fdNanos := fds.ByNumber(genid.Timestamp_Nanos_field_number)
+
+	if ts, ok := val.(primitive.DateTime); ok {
+		// t := time.Unix(int64(ts)/1e3, (int64(ts)%1e3)*1e6)
+		t := ts.Time()
+		// fmt.Printf("DateTime is %v (sec %d nano %d)\n", ts, t.Unix(), t.Nanosecond())
+		m.Set(fdSeconds, pref.ValueOfInt64(t.Unix()))
+		m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
+		return nil
+	}
+	var secs int64
+	switch reflect.TypeOf(val).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		secs = reflect.ValueOf(val).Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		secs = int64(reflect.ValueOf(val).Uint())
+	default:
+		return fmt.Errorf("invalid google.protobuf.Timestamp value %s", quoted(val))
+	}
+	m.Set(fdSeconds, pref.ValueOfInt64(secs))
+	return nil
+	// m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
+}
+
+/*
 func (d decoder) unmarshalTimestamp(m pref.Message) error {
 	tok, err := d.Read()
 	if err != nil {
@@ -898,6 +1213,7 @@ func (d decoder) unmarshalTimestamp(m pref.Message) error {
 	m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
 	return nil
 }
+*/
 
 // The JSON representation for a FieldMask is a JSON string where paths are
 // separated by a comma. Fields name in each path are converted to/from
@@ -926,6 +1242,7 @@ func (e encoder) marshalFieldMask(m pref.Message) (interface{}, error) {
 	return paths, nil
 }
 
+/*
 func (d decoder) unmarshalFieldMask(m pref.Message) error {
 	tok, err := d.Read()
 	if err != nil {
@@ -952,3 +1269,4 @@ func (d decoder) unmarshalFieldMask(m pref.Message) error {
 	}
 	return nil
 }
+*/
