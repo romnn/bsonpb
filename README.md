@@ -10,11 +10,11 @@ This package allows to serialize/deserialize go `protobuf` messages into/from `b
 
 **Important notes**: 
 - As of the time of writing, the golang protobuf implementation is actively transitioning from the old [github.com/golang/protobuf](https://github.com/golang/protobuf) to the new [google.golang.org/protobuf](https://github.com/protocolbuffers/protobuf-go) API.
-- Because of numerous version instabilities and inter-dependencies of both packages - especially with `bazel`, **both v1 and v2** are in an **experimental state**.
+- Because of numerous version instabilities and inter-dependencies of both packages - especially with the bazel build system, **both v1 and v2** are in an **experimental state**.
 
 ```go
-import "github.com/romnnn/bsonbp/v1" // For use with v1 (github.com/golang/protobuf)
-import "github.com/romnnn/bsonbp/v2" // For use with v2 (google.golang.org/protobuf)
+import "github.com/romnnn/bsonbp/v1" // v1 (github.com/golang/protobuf)
+import "github.com/romnnn/bsonbp/v2" // v2 (google.golang.org/protobuf)
 ```
 
 #### Usage (v2)
