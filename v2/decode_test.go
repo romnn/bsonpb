@@ -1,7 +1,3 @@
-// Copyright 2019 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package bsonpb
 
 import (
@@ -10,27 +6,15 @@ import (
 	"time"
 	"testing"
 
-	// "google.golang.org/protobuf/encoding/protojson"
-	// "google.golang.org/protobuf/internal/errors"
-	// "google.golang.org/protobuf/internal/flags"
 	"google.golang.org/protobuf/proto"
-	"github.com/google/go-cmp/cmp"
 	preg "google.golang.org/protobuf/reflect/protoregistry"
 
-	// pb2 "google.golang.org/protobuf/internal/testprotos/textpb2"
 	pb2 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb2_proto"
-	// pb3 "google.golang.org/protobuf/internal/testprotos/textpb3"
 	pb3 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb3_proto"
 
-	// testpb "google.golang.org/protobuf/internal/testprotos/test"
-	// weakpb "google.golang.org/protobuf/internal/testprotos/test/weak1"
-	// weakpb "github.com/romnnn/bsonpb/internal/testprotos/v2/weak_proto"
-	// pb2 "google.golang.org/protobuf/internal/testprotos/textpb2"
-	// pb3 "google.golang.org/protobuf/internal/testprotos/textpb3"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
-	// "google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -2453,18 +2437,8 @@ func TestUnmarshal(t *testing.T) {
 			if tt.wantErr != "" {
 				t.Errorf("Unmarshal() got nil error, want error %q", tt.wantErr)
 			}
-			/*
 			if tt.wantMessage != nil && !proto.Equal(tt.inputMessage, tt.wantMessage) {
 				t.Errorf("Unmarshal()\n<got>\n%v\n<want>\n%v\n", tt.inputMessage, tt.wantMessage)
-			}
-			*/
-			if tt.wantMessage != nil && !proto.Equal(tt.inputMessage, tt.wantMessage) {
-				t.Errorf("Unmarshal()\n<got>\n%v\n<want>\n%v\n", tt.inputMessage, tt.wantMessage)
-				if false {
-					if diff := cmp.Diff(tt.inputMessage, tt.wantMessage); diff != "" {
-						t.Errorf("Marshal() diff -want +got\n%v\n", diff)
-					}
-				}
 			}
 		})
 	}

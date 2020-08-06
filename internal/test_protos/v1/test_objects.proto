@@ -31,7 +31,7 @@
 
 syntax = "proto2";
 
-import "test_protos/bson.proto";
+import "internal/test_protos/v1/bson.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";

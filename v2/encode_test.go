@@ -1,7 +1,3 @@
-// Copyright 2019 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package bsonpb
 
 import (
@@ -13,34 +9,23 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/romnnn/deepequal"
 
-	// "google.golang.org/protobuf/encoding/protojson"
-	// "google.golang.org/protobuf/internal/detrand"
-	// "google.golang.org/protobuf/internal/flags"
 	"google.golang.org/protobuf/proto"
-	preg "google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/testing/protopack"
+	preg "google.golang.org/protobuf/reflect/protoregistry"
 
-	// pb2 "google.golang.org/protobuf/internal/testprotos/textpb2"
 	pb2 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb2_proto"
-	// pb3 "google.golang.org/protobuf/internal/testprotos/textpb3"
 	pb3 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb3_proto"
 
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
-	// "google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	// "github.com/romnn/bsonpb/v2"
 )
-
-func init() {
-	// Any initialization goes here
-}
 
 func TestMarshal(t *testing.T) {
 	tests := []struct {

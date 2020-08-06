@@ -9,7 +9,7 @@ import (
 	anypb "github.com/golang/protobuf/ptypes/any"
 	durpb "github.com/golang/protobuf/ptypes/duration"
 	tspb "github.com/golang/protobuf/ptypes/timestamp"
-	pb "github.com/romnnn/bsonpb/test_protos/test_objects"
+	pb "github.com/romnnn/bsonpb/internal/testprotos/v1/test_objects"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

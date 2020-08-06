@@ -1,7 +1,3 @@
-// Copyright 2019 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package bsonpb
 
 import (
@@ -14,21 +10,13 @@ import (
 	"time"
 	"errors"
 
-	// "google.golang.org/protobuf/internal/encoding/json"
-	// "github.com/romnnn/bsonpb/v2/internal/json"
-	// "google.golang.org/protobuf/internal/errors"
-	// "google.golang.org/protobuf/internal/genid"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
-	// "google.golang.org/protobuf/internal/strs"
 	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/protobuf/proto"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
-	// "google.golang.org/protobuf/types/known/timestamppb"
-	// "google.golang.org/protobuf/types/known/durationpb"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// bson.D
 type marshalFunc func(encoder, pref.Message) (interface{}, error)
 
 // wellKnownTypeMarshaler returns a marshal function if the message type
@@ -72,7 +60,6 @@ type unmarshalFunc func(decoder, interface{}, pref.Message) error
 // wellKnownTypeUnmarshaler returns a unmarshal function if the message type
 // has specialized serialization behavior. It returns nil otherwise.
 func wellKnownTypeUnmarshaler(name pref.FullName) unmarshalFunc {
-	// fmt.Printf("name=%s vs. %s", name.Name(), genid.BoolValue_message_name)
 	if name.Parent() == genid.GoogleProtobuf_package {
 		switch name.Name() {
 		case genid.Any_message_name:
@@ -122,7 +109,6 @@ func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
 		if !m.Has(fdValue) {
 			// If message is empty, marshal out empty JSON object.
 			return bson.D{}, nil
-			// return primitive.Null{}, nil
 		}
 		// Return error if type_url field is not set, but value is set.
 		return nil, fmt.Errorf("%s: %v is not set", genid.Any_message_fullname, genid.Any_TypeUrl_field_name)
@@ -133,13 +119,6 @@ func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
 	typeURL := typeVal.String()
 
 	// Marshal out @type field.
-	/*
-	typeURL := typeVal.String()
-	e.WriteName("@type")
-	if err := e.WriteString(typeURL); err != nil {
-		return err
-	}
-	*/
 	result = append(result, bson.E{Key: "@type", Value: typeURL})
 
 	// Resolve the type in order to unmarshal value field.
@@ -161,8 +140,6 @@ func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
 	// with corresponding custom JSON encoding of the embedded message as a
 	// field.
 	if marshal := wellKnownTypeMarshaler(emt.Descriptor().FullName()); marshal != nil {
-		// e.WriteName("value")
-		// return marshal(e, em)
 		val, err := marshal(e, em)
 		if err != nil {
 			return result, err
@@ -186,16 +163,7 @@ func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
 	// Use another decoder to parse the unread bytes for @type field. This
 	// avoids advancing a read from current decoder because the current JSON
 	// object may contain the fields of the embedded type.
-	// dec := decoder{}
-	
 	valD := val.(bson.D)
-	/*
-	tok, found := valD.Map()["@type"]
-	if len(valD) < 1 {
-		return nil
-	}
-	*/
-	// Check for duplicate @type field
 	var found, nonEmpty, ok bool
 	var typeURL string
 	for _, item := range valD {
@@ -226,7 +194,6 @@ func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
 		return errors.New("missing @type field in non-empty message")
 	}
 
-	fmt.Printf("unmarshalAny %v (typeURL=%s)\n", val, typeURL)
 	emt, err := d.opts.Resolver.FindMessageByURL(typeURL)
 	if err != nil {
 		return fmt.Errorf("unable to resolve %q: %s", typeURL, strings.Replace(err.Error(), "\u00a0", " ", -1))
@@ -273,7 +240,6 @@ func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
 }
 
 func (d decoder) unmarshalAnyValue(val bson.D, umFunc unmarshalFunc, m pref.Message) error {
-	// fmt.Printf("unmarshalMessage: %v => %v\n", doc, m.Descriptor().FullName())
 	var found bool
 	for _, item := range val {
 		switch item.Key {
@@ -300,247 +266,6 @@ func (d decoder) unmarshalAnyValue(val bson.D, umFunc unmarshalFunc, m pref.Mess
 	}
 	return nil
 }
-
-/*
-func (d decoder) unmarshalAny(val interface{}, m pref.Message) error {
-	/* Peek to check for json.ObjectOpen to avoid advancing a read.
-	start, err := d.Peek()
-	if err != nil {
-		return err
-	}
-	if start.Kind() != json.ObjectOpen {
-		return d.unexpectedTokenError(start)
-	}
-
-	// Use another decoder to parse the unread bytes for @type field. This
-	// avoids advancing a read from current decoder because the current JSON
-	// object may contain the fields of the embedded type.
-	dec := decoder{d.Clone(), UnmarshalOptions{}}
-	tok, err := findTypeURL(dec)
-	switch err {
-	case errEmptyObject:
-		// An empty JSON object translates to an empty Any message.
-		d.Read() // Read json.ObjectOpen.
-		d.Read() // Read json.ObjectClose.
-		return nil
-
-	case errMissingType:
-		if d.opts.DiscardUnknown {
-			// Treat all fields as unknowns, similar to an empty object.
-			return d.skipJSONValue()
-		}
-		// Use start.Pos() for line position.
-		return d.newError(start.Pos(), err.Error())
-
-	default:
-		if err != nil {
-			return err
-		}
-	}
-
-	typeURL := tok.ParsedString()
-	emt, err := d.opts.Resolver.FindMessageByURL(typeURL)
-	if err != nil {
-		return d.newError(tok.Pos(), "unable to resolve %v: %q", tok.RawString(), err)
-	}
-
-	// Create new message for the embedded message type and unmarshal into it.
-	em := emt.New()
-	if unmarshal := wellKnownTypeUnmarshaler(emt.Descriptor().FullName()); unmarshal != nil {
-		// If embedded message is a custom type,
-		// unmarshal the JSON "value" field into it.
-		if err := d.unmarshalAnyValue(unmarshal, em); err != nil {
-			return err
-		}
-	} else {
-		// Else unmarshal the current JSON object into it.
-		if err := d.unmarshalMessage(em, true); err != nil {
-			return err
-		}
-	}
-	// Serialize the embedded message and assign the resulting bytes to the
-	// proto value field.
-	b, err := proto.MarshalOptions{
-		AllowPartial:  true, // No need to check required fields inside an Any.
-		Deterministic: true,
-	}.Marshal(em.Interface())
-	if err != nil {
-		return d.newError(start.Pos(), "error in marshaling Any.value field: %v", err)
-	}
-
-	fds := m.Descriptor().Fields()
-	fdType := fds.ByNumber(genid.Any_TypeUrl_field_number)
-	fdValue := fds.ByNumber(genid.Any_Value_field_number)
-
-	m.Set(fdType, pref.ValueOfString(typeURL))
-	m.Set(fdValue, pref.ValueOfBytes(b))
-	return nil
-}
-*/
-
-var errEmptyObject = fmt.Errorf(`empty object`)
-var errMissingType = fmt.Errorf(`missing "@type" field`)
-
-/*
-// findTypeURL returns the token for the "@type" field value from the given
-// JSON bytes. It is expected that the given bytes start with json.ObjectOpen.
-// It returns errEmptyObject if the JSON object is empty or errMissingType if
-// @type field does not exist. It returns other error if the @type field is not
-// valid or other decoding issues.
-func findTypeURL(d decoder) (json.Token, error) {
-	var typeURL string
-	var typeTok json.Token
-	numFields := 0
-	// Skip start object.
-	d.Read()
-
-Loop:
-	for {
-		tok, err := d.Read()
-		if err != nil {
-			return json.Token{}, err
-		}
-
-		switch tok.Kind() {
-		case json.ObjectClose:
-			if typeURL == "" {
-				// Did not find @type field.
-				if numFields > 0 {
-					return json.Token{}, errMissingType
-				}
-				return json.Token{}, errEmptyObject
-			}
-			break Loop
-
-		case json.Name:
-			numFields++
-			if tok.Name() != "@type" {
-				// Skip value.
-				if err := d.skipJSONValue(); err != nil {
-					return json.Token{}, err
-				}
-				continue
-			}
-
-			// Return error if this was previously set already.
-			if typeURL != "" {
-				return json.Token{}, d.newError(tok.Pos(), `duplicate "@type" field`)
-			}
-			// Read field value.
-			tok, err := d.Read()
-			if err != nil {
-				return json.Token{}, err
-			}
-			if tok.Kind() != json.String {
-				return json.Token{}, d.newError(tok.Pos(), `@type field value is not a string: %v`, tok.RawString())
-			}
-			typeURL = tok.ParsedString()
-			if typeURL == "" {
-				return json.Token{}, d.newError(tok.Pos(), `@type field contains empty value`)
-			}
-			typeTok = tok
-		}
-	}
-
-	return typeTok, nil
-}
-
-// skipJSONValue parses a JSON value (null, boolean, string, number, object and
-// array) in order to advance the read to the next JSON value. It relies on
-// the decoder returning an error if the types are not in valid sequence.
-func (d decoder) skipJSONValue() error {
-	tok, err := d.Read()
-	if err != nil {
-		return err
-	}
-	// Only need to continue reading for objects and arrays.
-	switch tok.Kind() {
-	case json.ObjectOpen:
-		for {
-			tok, err := d.Read()
-			if err != nil {
-				return err
-			}
-			switch tok.Kind() {
-			case json.ObjectClose:
-				return nil
-			case json.Name:
-				// Skip object field value.
-				if err := d.skipJSONValue(); err != nil {
-					return err
-				}
-			}
-		}
-
-	case json.ArrayOpen:
-		for {
-			tok, err := d.Peek()
-			if err != nil {
-				return err
-			}
-			switch tok.Kind() {
-			case json.ArrayClose:
-				d.Read()
-				return nil
-			default:
-				// Skip array item.
-				if err := d.skipJSONValue(); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// unmarshalAnyValue unmarshals the given custom-type message from the JSON
-// object's "value" field.
-func (d decoder) unmarshalAnyValue(unmarshal unmarshalFunc, m pref.Message) error {
-	// Skip ObjectOpen, and start reading the fields.
-	d.Read()
-
-	var found bool // Used for detecting duplicate "value".
-	for {
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		switch tok.Kind() {
-		case json.ObjectClose:
-			if !found {
-				return d.newError(tok.Pos(), `missing "value" field`)
-			}
-			return nil
-
-		case json.Name:
-			switch tok.Name() {
-			case "@type":
-				// Skip the value as this was previously parsed already.
-				d.Read()
-
-			case "value":
-				if found {
-					return d.newError(tok.Pos(), `duplicate "value" field`)
-				}
-				// Unmarshal the field value into the given message.
-				if err := unmarshal(d, m); err != nil {
-					return err
-				}
-				found = true
-
-			default:
-				if d.opts.DiscardUnknown {
-					if err := d.skipJSONValue(); err != nil {
-						return err
-					}
-					continue
-				}
-				return d.newError(tok.Pos(), "unknown field %v", tok.RawString())
-			}
-		}
-	}
-}
-*/
 
 // Wrapper types are encoded as JSON primitives like string, number or boolean.
 
@@ -578,41 +303,6 @@ func (d decoder) unmarshalEmpty(val interface{}, m pref.Message) error {
 	return nil
 }
 
-/*
-func (d decoder) unmarshalEmpty(pref.Message) error {
-	tok, err := d.Read()
-	if err != nil {
-		return err
-	}
-	if tok.Kind() != json.ObjectOpen {
-		return d.unexpectedTokenError(tok)
-	}
-
-	for {
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		switch tok.Kind() {
-		case json.ObjectClose:
-			return nil
-
-		case json.Name:
-			if d.opts.DiscardUnknown {
-				if err := d.skipJSONValue(); err != nil {
-					return err
-				}
-				continue
-			}
-			return d.newError(tok.Pos(), "unknown field %v", tok.RawString())
-
-		default:
-			return d.unexpectedTokenError(tok)
-		}
-	}
-}
-*/
-
 // The JSON representation for Struct is a JSON object that contains the encoded
 // Struct.fields map and follows the serialization rules for a map.
 
@@ -623,7 +313,6 @@ func (e encoder) marshalStruct(m pref.Message) (interface{}, error) {
 
 func (d decoder) unmarshalStruct(val interface{}, m pref.Message) error {
 	fd := m.Descriptor().Fields().ByNumber(genid.Struct_Fields_field_number)
-	fmt.Printf("unmarshalStruct %v (fd=%v)", val, fd)
 	return d.unmarshalMap(val.(bson.D), m.Mutable(fd).Map(), fd)
 }
 
@@ -655,8 +344,6 @@ func (e encoder) marshalKnownValue(m pref.Message) (interface{}, error) {
 }
 
 func (d decoder) unmarshalKnownValue(val interface{}, m pref.Message) error {
-	fmt.Printf("Kind for %v (%T) is: %v\n", val, val, reflect.TypeOf(val).Kind())
-
 	var fd pref.FieldDescriptor
 	var pval pref.Value
 	valT := reflect.TypeOf(val)
@@ -677,19 +364,10 @@ func (d decoder) unmarshalKnownValue(val interface{}, m pref.Message) error {
 		reflect.Uint32,
 		reflect.Uint64:
 		fd = m.Descriptor().Fields().ByNumber(genid.Value_NumberValue_field_number)
-		// var ok bool
-		// unmarshalFloat(tok, 64)
 		pval = pref.ValueOfFloat64(float64(valV.Int()))
 	case reflect.Float32, reflect.Float64:
 		fd = m.Descriptor().Fields().ByNumber(genid.Value_NumberValue_field_number)
-		// var ok bool
-		// unmarshalFloat(tok, 64)
 		pval = pref.ValueOfFloat64(valV.Float())
-		/*
-		if !ok {
-			return fmt.Errorf"invalid %v: %v", genid.Value_message_fullname, val)
-		}
-		*/
 
 	case reflect.String:
 		// A JSON string may have been encoded from the number_value field,
@@ -718,7 +396,7 @@ func (d decoder) unmarshalKnownValue(val interface{}, m pref.Message) error {
 		}
 
 	case reflect.Array, reflect.Slice:
-		// Can be either .D or .A?
+		// Can be either .D or .A
 		if _, isD := val.(bson.D); isD {
 			fd = m.Descriptor().Fields().ByNumber(genid.Value_StructValue_field_number)
 			pval = m.NewField(fd)
@@ -740,78 +418,6 @@ func (d decoder) unmarshalKnownValue(val interface{}, m pref.Message) error {
 	m.Set(fd, pval)
 	return nil
 }
-
-/*
-func (d decoder) unmarshalKnownValue(m pref.Message) error {
-	tok, err := d.Peek()
-	if err != nil {
-		return err
-	}
-
-	var fd pref.FieldDescriptor
-	var val pref.Value
-	switch tok.Kind() {
-	case json.Null:
-		d.Read()
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_NullValue_field_number)
-		val = pref.ValueOfEnum(0)
-
-	case json.Bool:
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_BoolValue_field_number)
-		val = pref.ValueOfBool(tok.Bool())
-
-	case json.Number:
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_NumberValue_field_number)
-		var ok bool
-		val, ok = unmarshalFloat(tok, 64)
-		if !ok {
-			return d.newError(tok.Pos(), "invalid %v: %v", genid.Value_message_fullname, tok.RawString())
-		}
-
-	case json.String:
-		// A JSON string may have been encoded from the number_value field,
-		// e.g. "NaN", "Infinity", etc. Parsing a proto double type also allows
-		// for it to be in JSON string form. Given this custom encoding spec,
-		// however, there is no way to identify that and hence a JSON string is
-		// always assigned to the string_value field, which means that certain
-		// encoding cannot be parsed back to the same field.
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_StringValue_field_number)
-		val = pref.ValueOfString(tok.ParsedString())
-
-	case json.ObjectOpen:
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_StructValue_field_number)
-		val = m.NewField(fd)
-		if err := d.unmarshalStruct(val.Message()); err != nil {
-			return err
-		}
-
-	case json.ArrayOpen:
-		fd = m.Descriptor().Fields().ByNumber(genid.Value_ListValue_field_number)
-		val = m.NewField(fd)
-		if err := d.unmarshalListValue(val.Message()); err != nil {
-			return err
-		}
-
-	default:
-		return d.newError(tok.Pos(), "invalid %v: %v", genid.Value_message_fullname, tok.RawString())
-	}
-
-	m.Set(fd, val)
-	return nil
-}
-*/
 
 // The JSON representation for a Duration is a JSON string that ends in the
 // suffix "s" (indicating seconds) and is preceded by the number of seconds,
@@ -856,58 +462,10 @@ func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	if _, err := isValidDuration(secs, nanos); err != nil {
 		return bson.D{}, err
 	}
-	/*
-	// Generated output always contains 0, 3, 6, or 9 fractional digits,
-	// depending on required precision, followed by the suffix "s".
-	f := "%d.%09d"
-	if nanos < 0 {
-		nanos = -nanos
-		if secs == 0 {
-			f = "-%d.%09d"
-		}
-	}
-	x := fmt.Sprintf(f, secs, nanos)
-	x = strings.TrimSuffix(x, "000")
-	x = strings.TrimSuffix(x, "000")
-	x = strings.TrimSuffix(x, ".000")
-	e.WriteString(x + "s")
-	return nil
-	*/
-	/*
-	dur, ok := m.Interface().(*durationpb.Duration)
-	if !ok {
-		return nil, errors.New("Not a duration")
-	}
-	*/
-	/*
-	if err := dur.CheckValid(); err != nil {
-		return nil, errors.New("Invalid duration")
-	}
-	return dur.AsDuration().Seconds(), nil
-	*/
 	return bson.D{
 		{Key: "Seconds", Value: secs},
 		{Key: "Nanos", Value: nanos},
 	}, nil
-	// return AsDuration(dur).Seconds(), nil
-	/*
-	sec, ns := sdur.Seconds, sdur.Nanos
-	if sec < -maxSecondsInDuration || sec > maxSecondsInDuration {
-		return nil, fmt.Errorf("seconds out of range %v", s)
-	}
-	if ns <= -secondInNanos || ns >= secondInNanos {
-		return nil, fmt.Errorf("ns out of range (%v, %v)", -secondInNanos, secondInNanos)
-	}
-	if (sec > 0 && ns < 0) || (sec < 0 && ns > 0) {
-		return nil, errors.New("signs of seconds and nanos do not match")
-	}
-	native, err := ptypes.Duration(sdur)
-	if err != nil {
-		return nil, err
-	}
-	converted := native.Seconds()
-	return converted, nil
-	*/
 }
 
 func (d decoder) unmarshalDuration(val interface{}, m pref.Message) error {
@@ -950,36 +508,6 @@ func (d decoder) unmarshalDuration(val interface{}, m pref.Message) error {
 	m.Set(fdNanos, pref.ValueOfInt32(int32(nanos)))
 	return nil
 }
-
-/*
-func (d decoder) unmarshalDuration(m pref.Message) error {
-	tok, err := d.Read()
-	if err != nil {
-		return err
-	}
-	if tok.Kind() != json.String {
-		return d.unexpectedTokenError(tok)
-	}
-
-	secs, nanos, ok := parseDuration(tok.ParsedString())
-	if !ok {
-		return d.newError(tok.Pos(), "invalid %v value %v", genid.Duration_message_fullname, tok.RawString())
-	}
-	// Validate seconds. No need to validate nanos because parseDuration would
-	// have covered that already.
-	if secs < -maxSecondsInDuration || secs > maxSecondsInDuration {
-		return d.newError(tok.Pos(), "%v value out of range: %v", genid.Duration_message_fullname, tok.RawString())
-	}
-
-	fds := m.Descriptor().Fields()
-	fdSeconds := fds.ByNumber(genid.Duration_Seconds_field_number)
-	fdNanos := fds.ByNumber(genid.Duration_Nanos_field_number)
-
-	m.Set(fdSeconds, pref.ValueOfInt64(secs))
-	m.Set(fdNanos, pref.ValueOfInt32(nanos))
-	return nil
-}
-*/
 
 // parseDuration parses the given input string for seconds and nanoseconds value
 // for the Duration JSON format. The format is a decimal number with a suffix
@@ -1132,28 +660,6 @@ func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	if _, err := isValidTimestamp(secs, nanos); err != nil {
 		return bson.D{}, err
 	}
-	/*
-	// Uses RFC 3339, where generated output will be Z-normalized and uses 0, 3,
-	// 6 or 9 fractional digits.
-	t := time.Unix(secs, nanos).UTC()
-	x := t.Format("2006-01-02T15:04:05.000000000")
-	x = strings.TrimSuffix(x, "000")
-	x = strings.TrimSuffix(x, "000")
-	x = strings.TrimSuffix(x, ".000")
-	e.WriteString(x + "Z")
-	*/
-	/* Convert proto timestamp to golang time.Time
-	vv, ok := m.Interface().(*timestamppb.Timestamp)
-	if !ok {
-		return bson.D{}, fmt.Errorf("Timestamp: Have %v but need a protobuf timestamp", m)
-	}
-	*/
-	/*
-	if err := vv.CheckValid(); err != nil {
-		return nil, errors.New("Invalid timestamp")
-	}
-	return primitive.NewDateTimeFromTime(vv.AsTime()), nil
-	*/
 	return primitive.NewDateTimeFromTime(time.Unix(secs, nanos).UTC()), nil
 }
 
@@ -1163,9 +669,7 @@ func (d decoder) unmarshalTimestamp(val interface{}, m pref.Message) error {
 	fdNanos := fds.ByNumber(genid.Timestamp_Nanos_field_number)
 
 	if ts, ok := val.(primitive.DateTime); ok {
-		// t := time.Unix(int64(ts)/1e3, (int64(ts)%1e3)*1e6)
 		t := ts.Time()
-		// fmt.Printf("DateTime is %v (sec %d nano %d)\n", ts, t.Unix(), t.Nanosecond())
 		m.Set(fdSeconds, pref.ValueOfInt64(t.Unix()))
 		m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
 		return nil
@@ -1181,39 +685,7 @@ func (d decoder) unmarshalTimestamp(val interface{}, m pref.Message) error {
 	}
 	m.Set(fdSeconds, pref.ValueOfInt64(secs))
 	return nil
-	// m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
 }
-
-/*
-func (d decoder) unmarshalTimestamp(m pref.Message) error {
-	tok, err := d.Read()
-	if err != nil {
-		return err
-	}
-	if tok.Kind() != json.String {
-		return d.unexpectedTokenError(tok)
-	}
-
-	t, err := time.Parse(time.RFC3339Nano, tok.ParsedString())
-	if err != nil {
-		return d.newError(tok.Pos(), "invalid %v value %v", genid.Timestamp_message_fullname, tok.RawString())
-	}
-	// Validate seconds. No need to validate nanos because time.Parse would have
-	// covered that already.
-	secs := t.Unix()
-	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
-		return d.newError(tok.Pos(), "%v value out of range: %v", genid.Timestamp_message_fullname, tok.RawString())
-	}
-
-	fds := m.Descriptor().Fields()
-	fdSeconds := fds.ByNumber(genid.Timestamp_Seconds_field_number)
-	fdNanos := fds.ByNumber(genid.Timestamp_Nanos_field_number)
-
-	m.Set(fdSeconds, pref.ValueOfInt64(secs))
-	m.Set(fdNanos, pref.ValueOfInt32(int32(t.Nanosecond())))
-	return nil
-}
-*/
 
 // The JSON representation for a FieldMask is a JSON string where paths are
 // separated by a comma. Fields name in each path are converted to/from
@@ -1223,7 +695,6 @@ func (d decoder) unmarshalTimestamp(m pref.Message) error {
 func (e encoder) marshalFieldMask(m pref.Message) (interface{}, error) {
 	fd := m.Descriptor().Fields().ByNumber(genid.FieldMask_Paths_field_number)
 	list := m.Get(fd).List()
-	// paths := make([]bson.A, 0, list.Len())
 	paths := bson.A{}
 
 	for i := 0; i < list.Len(); i++ {
@@ -1238,11 +709,11 @@ func (e encoder) marshalFieldMask(m pref.Message) (interface{}, error) {
 		}
 		paths = append(paths, cc)
 	}	
-	// e.WriteString(strings.Join(paths, ","))
 	return paths, nil
 }
 
 /*
+// TODO
 func (d decoder) unmarshalFieldMask(m pref.Message) error {
 	tok, err := d.Read()
 	if err != nil {

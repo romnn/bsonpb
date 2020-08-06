@@ -1,27 +1,28 @@
 package main
 
 import (
-	pb "github.com/romnnn/bsonpb/internal/testprotos/v2/proto3_proto"
+	pb "github.com/romnnn/bsonpb/internal/testprotos/v1/test_objects"
 	"google.golang.org/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"github.com/romnnn/bsonpb/v2"
+	"github.com/romnnn/bsonpb/v1"
 )
 
 func main() {
-	someProto := &pb.Message{Name: "Test", Hilarity: pb.Message_SLAPSTICK}
+	someProto := &pb.Widget{RColor: []pb.Widget_Color{pb.Widget_RED}}
 	log.Infof("Original message proto: %v", someProto)
 
 	// Marshal
-	opts := bsonpb.MarshalOptions{}
-	marshaled, err := opts.Marshal(someProto)
+	m := &bsonpb.Marshaler{}
+	marshaled, err := m.Marshal(someProto)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("Message proto marshaled: %v", marshaled)
 
 	// Unmarshal back
-	var someProto2 pb.Message
-	if err := bsonpb.Unmarshal(marshaled, &someProto2); err != nil {
+	um := &bsonpb.Unmarshaler{}
+	var someProto2 pb.Widget
+	if err := um.Unmarshal(marshaled, &someProto2); err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("Message proto unmarshaled: %v", someProto2)

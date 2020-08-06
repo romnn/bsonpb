@@ -7,8 +7,8 @@ go_binary(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//v2:go_default_library",
-        "//internal/test_protos/v2/proto3_proto:test_go_proto",
+        "//v1:go_default_library",
+        "//internal/test_protos/v1:test_objects_go_proto",
         "@org_mongodb_go_mongo_driver//bson:go_default_library",
         "@com_github_sirupsen_logrus//:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",

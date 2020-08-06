@@ -1,24 +1,12 @@
-// Copyright 2019 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package bsonpb
 
 import (
-	// "encoding/base64"
 	"unicode/utf8"
 	"fmt"
 	"sort"
 	"errors"
 
-	// "google.golang.org/protobuf/internal/encoding/json"
-	// "github.com/romnnn/bsonpb/v2/internal/json"
-	// "google.golang.org/protobuf/internal/encoding/messageset"
-	// "google.golang.org/protobuf/internal/errors"
-	// "google.golang.org/protobuf/internal/flags"
-	// "google.golang.org/protobuf/internal/genid"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
-	// "google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/proto"
 	"go.mongodb.org/mongo-driver/bson"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
@@ -29,7 +17,7 @@ import (
 const (
 	protoLegacy = false
 	defaultIndent = "  "
-	ExtensionName = "message_set_extension"
+	extensionName = "message_set_extension"
 )
 
 // IsMessageSet returns whether the message uses the MessageSet wire format.
@@ -40,7 +28,7 @@ func IsMessageSet(md pref.MessageDescriptor) bool {
 
 // IsMessageSetExtension reports this field extends a MessageSet.
 func IsMessageSetExtension(fd pref.FieldDescriptor) bool {
-	if fd.Name() != ExtensionName {
+	if fd.Name() != extensionName {
 		return false
 	}
 	if fd.FullName().Parent() != fd.Message().FullName() {
@@ -48,16 +36,6 @@ func IsMessageSetExtension(fd pref.FieldDescriptor) bool {
 	}
 	return IsMessageSet(fd.ContainingMessage())
 }
-
-// Format formats the message as a multiline string.
-// This function is only intended for human consumption and ignores errors.
-// Do not depend on the output being stable. It may change over time across
-// different versions of the program.
-/*
-func Format(m proto.Message) string {
-	return MarshalOptions{Multiline: true}.Format(m)
-}
-*/
 
 // Marshal writes the given proto.Message in JSON format using default options.
 // Do not depend on the output being stable. It may change over time across
@@ -120,21 +98,6 @@ type MarshalOptions struct {
 		protoregistry.MessageTypeResolver
 	}
 }
-
-// Format formats the message as a string.
-// This method is only intended for human consumption and ignores errors.
-// Do not depend on the output being stable. It may change over time across
-// different versions of the program.
-/*
-func (o MarshalOptions) Format(m proto.Message) string {
-	if m == nil || !m.ProtoReflect().IsValid() {
-		return "<nil>" // invalid syntax, but okay since this is for debugging
-	}
-	o.AllowPartial = true
-	b, _ := o.Marshal(m)
-	return string(b)
-}
-*/
 
 // Marshal marshals the given proto.Message in the JSON format using options in
 // MarshalOptions. Do not depend on the output being stable. It may change over
@@ -233,14 +196,6 @@ func (e encoder) marshalFields(m pref.Message) (bson.D, error) {
 				name = string(fd.Message().Name())
 			}
 		}
-		/*
-		if err := e.WriteName(name); err != nil {
-			return err
-		}
-		if err := e.marshalValue(val, fd); err != nil {
-			return err
-		}
-		*/
 
 		marshaled, err := e.marshalValue(val, fd)
 		if err != nil {
@@ -258,19 +213,6 @@ func (e encoder) marshalFields(m pref.Message) (bson.D, error) {
 	return result, nil
 }
 
-/*
-// marshalValue marshals the given protoreflect.Value.
-func (e encoder) marshalValue(val pref.Value, fd pref.FieldDescriptor) error {
-	switch {
-	case fd.IsList():
-		return e.marshalList(val.List(), fd)
-	case fd.IsMap():
-		return e.marshalMap(val.Map(), fd)
-	default:
-		return e.marshalSingular(val, fd)
-	}
-}*/
-
 func (e encoder) marshalValue(val pref.Value, fd pref.FieldDescriptor) (interface{}, error) {
 	// fmt.Printf("Marshal Value: %s: %v\n", name, val)
 	switch {
@@ -285,76 +227,49 @@ func (e encoder) marshalValue(val pref.Value, fd pref.FieldDescriptor) (interfac
 
 func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) (interface{}, error) {
 	if !val.IsValid() {
-		// e.WriteNull()
 		return primitive.Null{}, nil
 	}
 
 	switch kind := fd.Kind(); kind {
 	case pref.BoolKind:
 		return val.Bool(), nil
-		// e.WriteBool(val.Bool())
 
 	case pref.StringKind:
 		if valid := utf8.Valid([]byte(val.String())); valid {
 			return val.String(), nil
 		}
 		return "", fmt.Errorf("InvalidUTF8: %s", val.String())
-		/*
-		if e.WriteString(val.String()) != nil {
-			return fmt.Errorf("InvalidUTF8: %s", string(fd.FullName()))
-		}
-		*/
 
 	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
 		return int32(val.Int()), nil
-		// e.WriteInt(val.Int())
 
 	case pref.Uint32Kind, pref.Fixed32Kind:
 		return uint32(val.Uint()), nil
-		// e.WriteUint(val.Uint())
 
 	case pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
 		return val.Int(), nil
-		// e.WriteInt(val.Int())
 
 	case pref.Uint64Kind, pref.Fixed64Kind:
 		return val.Uint(), nil
-		// e.WriteUint(val.Uint())
-
-	/*
-	case pref.Int64Kind, pref.Sint64Kind, pref.Uint64Kind,
-		pref.Sfixed64Kind, pref.Fixed64Kind:
-		return val.Int(), nil
-		// 64-bit integers are written out as JSON string.
-		// e.WriteString(val.String())
-	*/
 
 	case pref.FloatKind:
-		// Encoder.WriteFloat handles the special numbers NaN and infinites.
 		return float32(val.Float()), nil
-		// e.WriteFloat(val.Float(), 32)
 
 	case pref.DoubleKind:
-		// Encoder.WriteFloat handles the special numbers NaN and infinites.
 		return val.Float(), nil
-		// e.WriteFloat(val.Float(), 64)
 
 	case pref.BytesKind:
 		return primitive.Binary{Data: val.Bytes()}, nil
-		// e.WriteString(base64.StdEncoding.EncodeToString(val.Bytes()))
 
 	case pref.EnumKind:
 		if fd.Enum().FullName() == genid.NullValue_enum_fullname {
 			return primitive.Null{}, nil
-			//e.WriteNull()
 		} 
 		desc := fd.Enum().Values().ByNumber(val.Enum())
 		if e.opts.UseEnumNumbers || desc == nil {
 			return int64(val.Enum()), nil
-			// e.WriteInt(int64(val.Enum()))
 		} 
 		return string(desc.Name()), nil
-		// e.WriteString(string(desc.Name()))
 
 	case pref.MessageKind, pref.GroupKind:
 		marshaled, err := e.marshalMessage(val.Message())
@@ -405,15 +320,6 @@ func (e encoder) marshalMap(mmap pref.Map, fd pref.FieldDescriptor) (interface{}
 			return nil, err
 		}
 		result = append(result, bson.E{Key: entry.key.String(), Value: val})
-		/*
-		if err := e.WriteName(entry.key.String()); err != nil {
-			return err
-		}
-		if err := e.marshalSingular(entry.value, fd.MapValue()); err != nil {
-			return err
-		}
-		*/
-
 	}
 	return result, nil
 }
@@ -475,14 +381,6 @@ func (e encoder) marshalExtensions(m pref.Message) ([]bson.E, error) {
 		// JSON field name is the proto field name enclosed in [], similar to
 		// textproto. This is consistent with Go v1 lib. C++ lib v3.7.0 does not
 		// marshal out extension fields.
-		/*
-		if err := e.WriteName("[" + entry.key + "]"); err != nil {
-			return err
-		}
-		if err := e.marshalValue(entry.value, entry.desc); err != nil {
-			return err
-		}
-		*/
 		marshaled, err := e.marshalValue(entry.value, entry.desc)
 		if err != nil {
 			return result, err
