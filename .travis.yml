@@ -21,7 +21,7 @@ matrix:
   fast_finish: true
 
 env:
-  - V=2.0.0
+  - V=3.4.1
 
 before_install:
   - OS=linux
