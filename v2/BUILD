@@ -62,5 +62,9 @@ go_test(
 
 test_suite(
     name = "go_default_test",
+    tests = [
+        ":encode",
+        ":decode",
+    ],
     tags = [],
 )
