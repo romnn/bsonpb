@@ -1,3 +1,3 @@
 package bsonpb
 
-const Version = "0.0.4"
+const Version = "0.1.0"
