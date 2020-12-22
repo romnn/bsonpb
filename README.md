@@ -6,61 +6,57 @@
 [![Test Coverage](https://codecov.io/gh/romnnn/bsonpb/branch/master/graph/badge.svg)](https://codecov.io/gh/romnnn/bsonpb)
 [![Release](https://img.shields.io/github/v/release/romnnn/bsonpb)](https://github.com/romnnn/bsonpb/releases/latest)
 
-This package allows to serialize/deserialize go `protobuf` messages into/from `bson` documents.
+This package allows to serialize/deserialize golang `protobuf` messages into/from `bson` documents.
 
-It was inspired by the official [golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) package.
+**Important notes**: 
+- This implementation has transitioned from the old [github.com/golang/protobuf](https://github.com/golang/protobuf) to the new [google.golang.org/protobuf](https://github.com/protocolbuffers/protobuf-go) API. The v1 implementation had various bazel related conflicts with the protobug dependency and is now abandoned under the `v1` branch.
 
 ```go
-import "github.com/romnnn/bsonbp"
+import "github.com/romnnn/bsonbp/v2" // only works with google.golang.org/protobuf, NOT github.com/golang/protobuf
 ```
 
-#### Marshaling
+#### Usage (v2)
+
+###### Marshaling
 
 ```golang
-marshaler := bsonbp.Marshaler{}
-myProto := &pb.Widget{RColor: []pb.Widget_Color{pb.Widget_RED}}
-bson, err := marshaler.Marshal(myProto)
+import "github.com/romnnn/bsonbp/v2"
+
+myProto := &pb.Message{Name: "Test", Hilarity: pb.Message_SLAPSTICK}
+opts := bsonpb.MarshalOptions{}
+marshaled, err := opts.Marshal(someProto)
 if err != nil {
-    log.Fatalf("Failed to marshal with error: %s\n", err.Error())
+    log.Fatal(err)
 }
-log.Printf("Marshaled bson: %s\n", bson)
+log.Infof("Marshaled: %v", marshaled)
 ```
 
-#### Unmarshaling
+###### Unmarshaling
 
 ```golang
-unmarshaler := bsonpb.Unmarshaler{}
-widgetBson := bson.D{{"rColor", bson.A{"RED"}}}
+import "github.com/romnnn/bsonbp/v2"
 
-// Marshal bson to bytes
-rawBson, err := bson.Marshal(widgetBson)
-if err != nil {
-    fmt.Printf("marshaling bson to bytes failed: %s", err.Error())
+var myProto pb.Message
+inputBson := bson.D{{Key: "Name", Value: "Test"}}
+if err := bsonpb.Unmarshal(inputBson, &myProto); err != nil {
+    log.Fatal(err)
 }
-
-var result pb.Widget
-err = unmarshaler.Unmarshal(rawBson, &result)
-if err != nil {
-    log.Fatalf("unmarshaling failed: %s\n", err.Error())
-}
-log.Printf("Unmarshaled proto: %s\n", result)
+log.Infof("Unmarshaled: %v", myProto)
 ```
 
-You can also run the examples if you wish:
-
+If you want to try it, you can run the provided example with
 ```bash
-bazel run //examples/marshal
-bazel run //examples/unmarshal
+bazel run //examples/v2:example
 ```
 
 #### Tests
 
 ```bash
 bazel test //:go_default_test
-bazel test //:marshal_test  # Marshalling tests only
-bazel test //:unmarshal_test  # Unmarshalling tests only
+bazel test //v2:go_default_test # v2 only
 ```
 
 #### Acknowledgements
 
-- Authors of the [golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) package that was used as a starting point.
+- The v1 implementation was inspired by the official [github.com/golang/protobuf/jsonpb](https://github.com/golang/protobuf/tree/master/jsonpb) implementation.
+- The v2 implementation was inspired by the official [google.golang.org/protobuf/encoding/protojson](https://github.com/protocolbuffers/protobuf-go/blob/master/encoding/protojson) implementation.

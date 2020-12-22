@@ -1,0 +1,5 @@
+# build --protocopt=--experimental_allow_proto3_optional=true
+# run --protocopt=--experimental_allow_proto3_optional=true
+# test --protocopt=--experimental_allow_proto3_optional=true
+
+test --test_strategy=standalone --test_output=streamed --cache_test_results=no
