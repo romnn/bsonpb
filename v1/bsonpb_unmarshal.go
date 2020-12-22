@@ -22,17 +22,73 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// BSONPBUnmarshaler is implemented by protobuf messages that customize
+// BSONUnmarshaler is implemented by protobuf messages that customize
 // the way they are unmarshaled from BSON. Messages that implement this
 // should also implement BSONPBMarshaler so that the custom format can be
 // produced.
 //
 // The BSON unmarshaling must follow the BSON to proto specification:
-type BSONPBUnmarshaler interface {
-	// UnmarshalBSONPB(*Unmarshaler, bson.D, proto.Message) (protoerror // bson.D
-	UnmarshalBSONPB(*Unmarshaler, bson.M) error
+type BSONUnmarshaler interface {
+	UnmarshalBSON(*decoder, bson.M) error
 }
 
+// Unmarshal reads the given bson.D into the given proto.Message.
+func Unmarshal(doc interface{}, m proto.Message) error {
+	return UnmarshalOptions{}.Unmarshal(doc, m)
+}
+
+// UnmarshalOptions is a configurable JSON format parser.
+type UnmarshalOptions struct {
+	// Whether to allow messages to contain unknown fields, as opposed to
+	// failing to unmarshal.
+	AllowUnknownFields bool
+
+	// A custom URL resolver to use when unmarshaling Any messages from BSON.
+	// If unset, the default resolution strategy is to extract the
+	// fully-qualified type name from the type URL and pass that to
+	// proto.MessageType(string).
+	AnyResolver AnyResolver
+}
+
+// Unmarshal reads the given []byte and populates the given proto.Message using
+// options in UnmarshalOptions object. It will clear the message first before
+// setting the fields. If it returns an error, the given message may be
+// partially set.
+func (o UnmarshalOptions) Unmarshal(doc interface{}, m proto.Message) error {
+	return o.unmarshal(doc, m)
+}
+
+// UnmarshalBytes ...
+func (o UnmarshalOptions) UnmarshalBytes(b []byte, m proto.Message) error {
+	reader := bsonrw.NewBSONDocumentReader(b)
+	bsonDec, err := bson.NewDecoder(reader)
+	if err != nil {
+		return fmt.Errorf("Failed to create decoder for BSON stream: %s", err.Error())
+	}
+
+	var inputValue bson.D
+	if err := bsonDec.Decode(&inputValue); err != nil {
+		return fmt.Errorf("Failed to decode bson into interface: %s", err.Error())
+	}
+	return o.unmarshal(inputValue, m)
+}
+
+type decoder struct {
+	opts UnmarshalOptions
+}
+
+// unmarshal is a centralized function that all unmarshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for unmarshal that do not go through this.
+func (o UnmarshalOptions) unmarshal(doc interface{}, m proto.Message) error {
+	u := decoder{o}
+	if err := u.unmarshalValue(reflect.ValueOf(m).Elem(), doc, nil); err != nil {
+		return err
+	}
+	return checkRequiredFields(m)
+}
+
+/*
 // Unmarshaler is a configurable object for converting from a BSON
 // representation to a protocol buffer object.
 type Unmarshaler struct {
@@ -106,8 +162,9 @@ func Unmarshal(data []byte, pb proto.Message) error {
 func UnmarshalBSON(data bson.D, pb proto.Message) error {
 	return new(Unmarshaler).UnmarshalBSON(data, pb)
 }
+*/
 
-func (u *Unmarshaler) unmarshalFromSafeString(v string, dest interface{}) error {
+func (u *decoder) unmarshalFromSafeString(v string, dest interface{}) error {
 	err := json.Unmarshal([]byte(v), dest)
 	if err != nil {
 		return err
@@ -136,8 +193,7 @@ func consumeField(prop *proto.Properties, bsonFields bson.M) (interface{}, strin
 }
 
 // unmarshalValue converts/copies a value into the target.
-// prop may be nil.
-func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{}, prop *proto.Properties) error {
+func (u *decoder) unmarshalValue(target reflect.Value, inputValue interface{}, prop *proto.Properties) error {
 
 	targetType := target.Type()
 
@@ -145,8 +201,8 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{
 	if targetType.Kind() == reflect.Ptr {
 		// If input value is "null" and target is a pointer type, then the field should be treated as not set
 		// UNLESS the target is structpb.Value, in which case it should be set to structpb.NullValue.
-		_, isBSONPBUnmarshaler := target.Interface().(BSONPBUnmarshaler)
-		if (inputValue == primitive.Null{}) && targetType != reflect.TypeOf(&stpb.Value{}) && !isBSONPBUnmarshaler {
+		_, isBSONUnmarshaler := target.Interface().(BSONUnmarshaler)
+		if (inputValue == primitive.Null{}) && targetType != reflect.TypeOf(&stpb.Value{}) && !isBSONUnmarshaler {
 			return nil
 		}
 
@@ -154,12 +210,12 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{
 		return u.unmarshalValue(target.Elem(), inputValue, prop)
 	}
 
-	if customUnmarshaler, ok := target.Addr().Interface().(BSONPBUnmarshaler); ok {
+	if customUnmarshaler, ok := target.Addr().Interface().(BSONUnmarshaler); ok {
 		inputD, ok := inputValue.(bson.M)
 		if !ok {
 			return errors.New("Not a bson.M")
 		}
-		return customUnmarshaler.UnmarshalBSONPB(u, inputD)
+		return customUnmarshaler.UnmarshalBSON(u, inputD)
 	}
 
 	// Handle well-known types that are not pointers.
@@ -186,8 +242,8 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{
 
 			var m proto.Message
 			var err error
-			if u.AnyResolver != nil {
-				m, err = u.AnyResolver.Resolve(turl)
+			if u.opts.AnyResolver != nil {
+				m, err = u.opts.AnyResolver.Resolve(turl)
 			} else {
 				m, err = defaultResolveAny(turl)
 			}
@@ -349,7 +405,11 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{
 	if targetType.Kind() == reflect.Struct {
 		bsonFields, ok := inputValue.(bson.M)
 		if !ok {
-			return fmt.Errorf("Nested: Have %v but need a map (bson.M)", reflect.TypeOf(inputValue))
+			if d, ok := inputValue.(bson.D); ok {
+				bsonFields = d.Map()
+			} else {
+				return fmt.Errorf("Nested: Have %v but need a map (bson.D or bson.M)", reflect.TypeOf(inputValue))
+			}
 		}
 
 		sprops := proto.GetProperties(targetType)
@@ -407,7 +467,7 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue interface{
 				}
 			}
 		}
-		if !u.AllowUnknownFields && len(bsonFields) > 0 {
+		if !u.opts.AllowUnknownFields && len(bsonFields) > 0 {
 			// Pick any field to be the scapegoat.
 			var f string
 			for fname := range bsonFields {

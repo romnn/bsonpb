@@ -22,180 +22,180 @@ import (
 )
 
 var unmarshalingTests = []struct {
-	desc        string
-	unmarshaler Unmarshaler
-	bson        bson.D
-	pb          proto.Message
+	desc        	string
+	unmarshalOpts 	UnmarshalOptions
+	bson        	bson.D
+	pb          	proto.Message
 }{
-	{"simple flat object", Unmarshaler{}, simpleObjectOutputBSON, simpleObject},
-	{"repeated fields flat object", Unmarshaler{}, repeatsObjectBSON, repeatsObject},
-	{"nested message/enum flat object", Unmarshaler{}, complexObjectMinimalBSON, complexObject},
-	{"enum-string object", Unmarshaler{},
+	{"simple flat object", UnmarshalOptions{}, simpleObjectOutputBSON, simpleObject},
+	{"repeated fields flat object", UnmarshalOptions{}, repeatsObjectBSON, repeatsObject},
+	{"nested message/enum flat object", UnmarshalOptions{}, complexObjectMinimalBSON, complexObject},
+	{"enum-string object", UnmarshalOptions{},
 		bson.D{{"color", "BLUE"}},
 		&pb.Widget{Color: pb.Widget_BLUE.Enum()},
 	},
-	{"enum-value object", Unmarshaler{},
+	{"enum-value object", UnmarshalOptions{},
 		bson.D{{"color", 2}},
 		&pb.Widget{Color: pb.Widget_BLUE.Enum()},
 	},
-	{"unknown field with allowed option", Unmarshaler{AllowUnknownFields: true},
+	{"unknown field with allowed option", UnmarshalOptions{AllowUnknownFields: true},
 		bson.D{{"unknown", "foo"}, {"oInt32", int32(42)}},
 		innerSimple,
 	},
-	{"proto3 enum string", Unmarshaler{},
+	{"proto3 enum string", UnmarshalOptions{},
 		bson.D{{"hilarity", "PUNS"}},
 		&proto3pb.Message{Hilarity: proto3pb.Message_PUNS},
 	},
-	{"proto3 enum value", Unmarshaler{},
+	{"proto3 enum value", UnmarshalOptions{},
 		bson.D{{"hilarity", 1}},
 		&proto3pb.Message{Hilarity: proto3pb.Message_PUNS},
 	},
 	{"unknown enum value object",
-		Unmarshaler{},
+		UnmarshalOptions{},
 		bson.D{{"color", 1000}, {"r_color", bson.A{"RED"}}},
 		&pb.Widget{Color: pb.Widget_Color(1000).Enum(), RColor: []pb.Widget_Color{pb.Widget_RED}},
 	},
-	{"repeated proto3 enum", Unmarshaler{},
+	{"repeated proto3 enum", UnmarshalOptions{},
 		bson.D{{"rFunny", bson.A{"PUNS", "SLAPSTICK"}}},
 		&proto3pb.Message{RFunny: []proto3pb.Message_Humour{
 			proto3pb.Message_PUNS,
 			proto3pb.Message_SLAPSTICK,
 		}},
 	},
-	{"repeated proto3 enum as int", Unmarshaler{},
+	{"repeated proto3 enum as int", UnmarshalOptions{},
 		bson.D{{"rFunny", bson.A{1, 2}}},
 		&proto3pb.Message{RFunny: []proto3pb.Message_Humour{
 			proto3pb.Message_PUNS,
 			proto3pb.Message_SLAPSTICK,
 		}},
 	},
-	{"repeated proto3 enum as mix of strings and ints", Unmarshaler{},
+	{"repeated proto3 enum as mix of strings and ints", UnmarshalOptions{},
 		bson.D{{"rFunny", bson.A{"PUNS", 2}}},
 		&proto3pb.Message{RFunny: []proto3pb.Message_Humour{
 			proto3pb.Message_PUNS,
 			proto3pb.Message_SLAPSTICK,
 		}},
 	},
-	{"unquoted int64 object", Unmarshaler{},
+	{"unquoted int64 object", UnmarshalOptions{},
 		bson.D{{"oInt64", -314}, {"oInt32", int32(12)}},
 		&pb.Simple{OInt64: proto.Int64(-314), OInt32: proto.Int32(12)},
 	},
-	{"unquoted uint64 object", Unmarshaler{},
+	{"unquoted uint64 object", UnmarshalOptions{},
 		bson.D{{"oUint64", 123}, {"oInt32", int32(12)}},
 		&pb.Simple{OUint64: proto.Uint64(123), OInt32: proto.Int32(12)},
 	},
-	{"NaN", Unmarshaler{},
+	{"NaN", UnmarshalOptions{},
 		bson.D{{"oDouble", float64(math.NaN())}, {"oInt32", int32(12)}},
 		&pb.Simple{ODouble: proto.Float64(math.NaN()), OInt32: proto.Int32(12)},
 	},
-	{"Inf", Unmarshaler{},
+	{"Inf", UnmarshalOptions{},
 		bson.D{{"oFloat", proto.Float32(float32(math.Inf(1)))}, {"oInt32", int32(12)}},
 		&pb.Simple{OFloat: proto.Float32(float32(math.Inf(1))), OInt32: proto.Int32(12)},
 	},
-	{"-Inf", Unmarshaler{},
+	{"-Inf", UnmarshalOptions{},
 		bson.D{{"oDouble", proto.Float64(math.Inf(-1))}, {"oInt32", int32(12)}},
 		&pb.Simple{ODouble: proto.Float64(math.Inf(-1)), OInt32: proto.Int32(12)},
 	},
-	{"map<int64, int32>", Unmarshaler{},
+	{"map<int64, int32>", UnmarshalOptions{},
 		bson.D{{"nummy", bson.D{{"1", 2}, {"3", 4}}}},
 		&pb.Mappy{Nummy: map[int64]int32{1: 2, 3: 4}},
 	},
-	{"map<string, string>", Unmarshaler{},
+	{"map<string, string>", UnmarshalOptions{},
 		bson.D{{"strry", bson.D{{"one", "two"}, {"three", "four"}}}},
 		&pb.Mappy{Strry: map[string]string{"one": "two", "three": "four"}},
 	},
-	{"map<int32, Object>", Unmarshaler{},
+	{"map<int32, Object>", UnmarshalOptions{},
 		bson.D{{"objjy", bson.D{{"1", bson.D{{"dub", 1}}}}}},
 		&pb.Mappy{Objjy: map[int32]*pb.Simple3{1: {Dub: 1}}},
 	},
-	{"proto2 extension", Unmarshaler{}, realNumberBSON, realNumber},
-	{"Any with message", Unmarshaler{}, anySimpleBSON, anySimple},
-	{"Any with WKT", Unmarshaler{}, anyWellKnownBSON, anyWellKnown},
-	{"map<string, enum>", Unmarshaler{},
+	{"proto2 extension", UnmarshalOptions{}, realNumberBSON, realNumber},
+	{"Any with message", UnmarshalOptions{}, anySimpleBSON, anySimple},
+	{"Any with WKT", UnmarshalOptions{}, anyWellKnownBSON, anyWellKnown},
+	{"map<string, enum>", UnmarshalOptions{},
 		bson.D{{"enumy", bson.D{{"XIV", "ROMAN"}}}},
 		&pb.Mappy{Enumy: map[string]pb.Numeral{"XIV": pb.Numeral_ROMAN}},
 	},
-	{"map<string, enum as int>", Unmarshaler{},
+	{"map<string, enum as int>", UnmarshalOptions{},
 		bson.D{{"enumy", bson.D{{"XIV", 2}}}},
 		&pb.Mappy{Enumy: map[string]pb.Numeral{"XIV": pb.Numeral_ROMAN}},
 	},
-	{"oneof", Unmarshaler{},
+	{"oneof", UnmarshalOptions{},
 		bson.D{{"salary", 31000}},
 		&pb.MsgWithOneof{Union: &pb.MsgWithOneof_Salary{31000}},
 	},
-	{"oneof spec name", Unmarshaler{},
+	{"oneof spec name", UnmarshalOptions{},
 		bson.D{{"Country", "Australia"}},
 		&pb.MsgWithOneof{Union: &pb.MsgWithOneof_Country{"Australia"}},
 	},
-	{"oneof orig_name", Unmarshaler{},
+	{"oneof orig_name", UnmarshalOptions{},
 		bson.D{{"Country", "Australia"}},
 		&pb.MsgWithOneof{Union: &pb.MsgWithOneof_Country{"Australia"}},
 	},
-	{"oneof spec name2", Unmarshaler{},
+	{"oneof spec name2", UnmarshalOptions{},
 		bson.D{{"homeAddress", "Australia"}},
 		&pb.MsgWithOneof{Union: &pb.MsgWithOneof_HomeAddress{"Australia"}},
 	},
-	{"oneof orig_name2", Unmarshaler{},
+	{"oneof orig_name2", UnmarshalOptions{},
 		bson.D{{"home_address", "Australia"}},
 		&pb.MsgWithOneof{Union: &pb.MsgWithOneof_HomeAddress{"Australia"}},
 	},
-	{"orig_name input", Unmarshaler{},
+	{"orig_name input", UnmarshalOptions{},
 		bson.D{{"o_bool", true}, {"o_int32", int32(12)}},
 		&pb.Simple{OBool: proto.Bool(true), OInt32: proto.Int32(12)},
 	},
-	{"camelName input", Unmarshaler{},
+	{"camelName input", UnmarshalOptions{},
 		bson.D{{"oBool", true}, {"o_int32", int32(12)}},
 		&pb.Simple{OBool: proto.Bool(true), OInt32: proto.Int32(12)},
 	},
-	{"Duration", Unmarshaler{},
+	{"Duration", UnmarshalOptions{},
 		bson.D{{"dur", float64(3)}},
 		&pb.KnownTypes{Dur: &durpb.Duration{Seconds: 3}},
 	},
-	{"Duration", Unmarshaler{},
+	{"Duration", UnmarshalOptions{},
 		bson.D{{"dur", float64(4)}},
 		&pb.KnownTypes{Dur: &durpb.Duration{Seconds: 4}},
 	},
-	{"Duration with unicode", Unmarshaler{},
+	{"Duration with unicode", UnmarshalOptions{},
 		bson.D{{"dur", float64(3)}},
 		&pb.KnownTypes{Dur: &durpb.Duration{Seconds: 3}},
 	},
-	{"null Duration", Unmarshaler{},
+	{"null Duration", UnmarshalOptions{},
 		bson.D{{"dur", primitive.Null{}}},
 		&pb.KnownTypes{Dur: nil},
 	},
-	{"Timestamp", Unmarshaler{},
+	{"Timestamp", UnmarshalOptions{},
 		bson.D{{"ts", primitive.NewDateTimeFromTime(time.Unix(14e8, 21e6))}},
 		&pb.KnownTypes{Ts: &tspb.Timestamp{Seconds: 14e8, Nanos: 21e6}},
 	},
-	{"Timestamp", Unmarshaler{},
+	{"Timestamp", UnmarshalOptions{},
 		bson.D{{"ts", primitive.NewDateTimeFromTime(time.Unix(14e8, 0))}},
 		&pb.KnownTypes{Ts: &tspb.Timestamp{Seconds: 14e8, Nanos: 0}},
 	},
-	{"Timestamp with unicode", Unmarshaler{},
+	{"Timestamp with unicode", UnmarshalOptions{},
 		bson.D{{"ts", primitive.NewDateTimeFromTime(time.Unix(14e8, 0))}},
 		&pb.KnownTypes{Ts: &tspb.Timestamp{Seconds: 14e8, Nanos: 0}},
 	},
-	{"PreEpochTimestamp", Unmarshaler{},
+	{"PreEpochTimestamp", UnmarshalOptions{},
 		bson.D{{"ts", primitive.NewDateTimeFromTime(time.Unix(-2, 999999995))}},
 		&pb.KnownTypes{Ts: &tspb.Timestamp{Seconds: -1}},
 	},
-	{"ZeroTimeTimestamp", Unmarshaler{},
+	{"ZeroTimeTimestamp", UnmarshalOptions{},
 		bson.D{{"ts", primitive.NewDateTimeFromTime(time.Unix(-62135596800, 0))}},
 		&pb.KnownTypes{Ts: &tspb.Timestamp{Seconds: -6795364579, Nanos: 129000000}},
 	},
-	{"null Timestamp", Unmarshaler{},
+	{"null Timestamp", UnmarshalOptions{},
 		bson.D{{"ts", primitive.Null{}}},
 		&pb.KnownTypes{Ts: nil},
 	},
-	{"null Struct", Unmarshaler{},
+	{"null Struct", UnmarshalOptions{},
 		bson.D{},
 		&pb.KnownTypes{St: nil},
 	},
-	{"empty Struct", Unmarshaler{},
+	{"empty Struct", UnmarshalOptions{},
 		bson.D{{"st", bson.D{}}},
 		&pb.KnownTypes{St: &stpb.Struct{}},
 	},
-	{"basic Struct", Unmarshaler{},
+	{"basic Struct", UnmarshalOptions{},
 		bson.D{{"st", bson.D{{"a", "x"}, {"b", primitive.Null{}}, {"c", 3}, {"d", true}}}},
 		&pb.KnownTypes{St: &stpb.Struct{Fields: map[string]*stpb.Value{
 			"a": {Kind: &stpb.Value_StringValue{"x"}},
@@ -204,7 +204,7 @@ var unmarshalingTests = []struct {
 			"d": {Kind: &stpb.Value_BoolValue{true}},
 		}}},
 	},
-	{"nested Struct", Unmarshaler{},
+	{"nested Struct", UnmarshalOptions{},
 		bson.D{{"st", bson.D{{"a", bson.D{{"b", 1}, {"c", bson.A{bson.D{{"d", true}}, "f"}}}}}}},
 		&pb.KnownTypes{St: &stpb.Struct{Fields: map[string]*stpb.Value{
 			"a": {Kind: &stpb.Value_StructValue{&stpb.Struct{Fields: map[string]*stpb.Value{
@@ -216,15 +216,15 @@ var unmarshalingTests = []struct {
 			}}}},
 		}}},
 	},
-	{"null ListValue", Unmarshaler{},
+	{"null ListValue", UnmarshalOptions{},
 		bson.D{{"lv", primitive.Null{}}},
 		&pb.KnownTypes{Lv: nil},
 	},
-	{"empty ListValue", Unmarshaler{},
+	{"empty ListValue", UnmarshalOptions{},
 		bson.D{{"lv", bson.A{}}},
 		&pb.KnownTypes{Lv: &stpb.ListValue{}},
 	},
-	{"basic ListValue", Unmarshaler{},
+	{"basic ListValue", UnmarshalOptions{},
 		bson.D{{"lv", bson.A{"x", primitive.Null{}, 3, true}}},
 		&pb.KnownTypes{Lv: &stpb.ListValue{Values: []*stpb.Value{
 			{Kind: &stpb.Value_StringValue{"x"}},
@@ -233,27 +233,27 @@ var unmarshalingTests = []struct {
 			{Kind: &stpb.Value_BoolValue{true}},
 		}}},
 	},
-	{"number Value", Unmarshaler{},
+	{"number Value", UnmarshalOptions{},
 		bson.D{{"val", 1}},
 		&pb.KnownTypes{Val: &stpb.Value{Kind: &stpb.Value_NumberValue{1}}},
 	},
-	{"null Value", Unmarshaler{},
+	{"null Value", UnmarshalOptions{},
 		bson.D{{"val", primitive.Null{}}},
 		&pb.KnownTypes{Val: &stpb.Value{Kind: &stpb.Value_NullValue{stpb.NullValue_NULL_VALUE}}},
 	},
-	{"bool Value", Unmarshaler{},
+	{"bool Value", UnmarshalOptions{},
 		bson.D{{"val", true}},
 		&pb.KnownTypes{Val: &stpb.Value{Kind: &stpb.Value_BoolValue{true}}},
 	},
-	{"string Value", Unmarshaler{},
+	{"string Value", UnmarshalOptions{},
 		bson.D{{"val", "x"}},
 		&pb.KnownTypes{Val: &stpb.Value{Kind: &stpb.Value_StringValue{"x"}}},
 	},
-	{"string number value", Unmarshaler{},
+	{"string number value", UnmarshalOptions{},
 		bson.D{{"val", "9223372036854775807"}},
 		&pb.KnownTypes{Val: &stpb.Value{Kind: &stpb.Value_StringValue{"9223372036854775807"}}},
 	},
-	{"list of lists Value", Unmarshaler{},
+	{"list of lists Value", UnmarshalOptions{},
 		bson.D{{"val", bson.A{"x", bson.A{bson.A{"y"}, "z"}}}},
 		&pb.KnownTypes{Val: &stpb.Value{
 			Kind: &stpb.Value_ListValue{&stpb.ListValue{
@@ -271,43 +271,43 @@ var unmarshalingTests = []struct {
 			}}},
 		},
 	},
-	{"DoubleValue", Unmarshaler{},
+	{"DoubleValue", UnmarshalOptions{},
 		bson.D{{"dbl", 1.2}},
 		&pb.KnownTypes{Dbl: &wpb.DoubleValue{Value: 1.2}},
 	},
-	{"FloatValue", Unmarshaler{},
+	{"FloatValue", UnmarshalOptions{},
 		bson.D{{"flt", 1.2}},
 		&pb.KnownTypes{Flt: &wpb.FloatValue{Value: 1.2}},
 	},
-	{"Int64Value", Unmarshaler{},
+	{"Int64Value", UnmarshalOptions{},
 		bson.D{{"i64", -3}},
 		&pb.KnownTypes{I64: &wpb.Int64Value{Value: -3}},
 	},
-	{"UInt64Value", Unmarshaler{},
+	{"UInt64Value", UnmarshalOptions{},
 		bson.D{{"u64", 3}},
 		&pb.KnownTypes{U64: &wpb.UInt64Value{Value: 3}},
 	},
-	{"Int32Value", Unmarshaler{},
+	{"Int32Value", UnmarshalOptions{},
 		bson.D{{"i32", -4}},
 		&pb.KnownTypes{I32: &wpb.Int32Value{Value: -4}},
 	},
-	{"UInt32Value", Unmarshaler{},
+	{"UInt32Value", UnmarshalOptions{},
 		bson.D{{"u32", 4}},
 		&pb.KnownTypes{U32: &wpb.UInt32Value{Value: 4}},
 	},
-	{"BoolValue", Unmarshaler{},
+	{"BoolValue", UnmarshalOptions{},
 		bson.D{{"bool", true}},
 		&pb.KnownTypes{Bool: &wpb.BoolValue{Value: true}},
 	},
-	{"StringValue", Unmarshaler{},
+	{"StringValue", UnmarshalOptions{},
 		bson.D{{"str", "plush"}},
 		&pb.KnownTypes{Str: &wpb.StringValue{Value: "plush"}},
 	},
-	{"StringValue containing escaped character", Unmarshaler{},
+	{"StringValue containing escaped character", UnmarshalOptions{},
 		bson.D{{"str", "a/b"}},
 		&pb.KnownTypes{Str: &wpb.StringValue{Value: "a/b"}},
 	},
-	{"StructValue containing StringValue's", Unmarshaler{},
+	{"StructValue containing StringValue's", UnmarshalOptions{},
 		bson.D{{"escaped", "a/b"}, {"unicode", "\u00004E16\u0000754C"}},
 		&stpb.Struct{
 			Fields: map[string]*stpb.Value{
@@ -316,45 +316,47 @@ var unmarshalingTests = []struct {
 			},
 		},
 	},
-	{"BytesValue", Unmarshaler{},
+	{"BytesValue", UnmarshalOptions{},
 		bson.D{{"bytes", primitive.Binary{Data: []byte("wow")}}},
 		&pb.KnownTypes{Bytes: &wpb.BytesValue{Value: []byte("wow")}},
 	},
 
 	// Ensure that `null` as a value ends up with a nil pointer instead of a [type]Value struct.
-	{"null DoubleValue", Unmarshaler{}, bson.D{{"dbl", primitive.Null{}}}, &pb.KnownTypes{Dbl: nil}},
-	{"null FloatValue", Unmarshaler{}, bson.D{{"flt", primitive.Null{}}}, &pb.KnownTypes{Flt: nil}},
-	{"null Int64Value", Unmarshaler{}, bson.D{{"i64", primitive.Null{}}}, &pb.KnownTypes{I64: nil}},
-	{"null UInt64Value", Unmarshaler{}, bson.D{{"u64", primitive.Null{}}}, &pb.KnownTypes{U64: nil}},
-	{"null Int32Value", Unmarshaler{}, bson.D{{"i32", primitive.Null{}}}, &pb.KnownTypes{I32: nil}},
-	{"null UInt32Value", Unmarshaler{}, bson.D{{"u32", primitive.Null{}}}, &pb.KnownTypes{U32: nil}},
-	{"null BoolValue", Unmarshaler{}, bson.D{{"bool", primitive.Null{}}}, &pb.KnownTypes{Bool: nil}},
-	{"null StringValue", Unmarshaler{}, bson.D{{"str", primitive.Null{}}}, &pb.KnownTypes{Str: nil}},
-	{"null BytesValue", Unmarshaler{}, bson.D{{"bytes", primitive.Null{}}}, &pb.KnownTypes{Bytes: nil}},
+	{"null DoubleValue", UnmarshalOptions{}, bson.D{{"dbl", primitive.Null{}}}, &pb.KnownTypes{Dbl: nil}},
+	{"null FloatValue", UnmarshalOptions{}, bson.D{{"flt", primitive.Null{}}}, &pb.KnownTypes{Flt: nil}},
+	{"null Int64Value", UnmarshalOptions{}, bson.D{{"i64", primitive.Null{}}}, &pb.KnownTypes{I64: nil}},
+	{"null UInt64Value", UnmarshalOptions{}, bson.D{{"u64", primitive.Null{}}}, &pb.KnownTypes{U64: nil}},
+	{"null Int32Value", UnmarshalOptions{}, bson.D{{"i32", primitive.Null{}}}, &pb.KnownTypes{I32: nil}},
+	{"null UInt32Value", UnmarshalOptions{}, bson.D{{"u32", primitive.Null{}}}, &pb.KnownTypes{U32: nil}},
+	{"null BoolValue", UnmarshalOptions{}, bson.D{{"bool", primitive.Null{}}}, &pb.KnownTypes{Bool: nil}},
+	{"null StringValue", UnmarshalOptions{}, bson.D{{"str", primitive.Null{}}}, &pb.KnownTypes{Str: nil}},
+	{"null BytesValue", UnmarshalOptions{}, bson.D{{"bytes", primitive.Null{}}}, &pb.KnownTypes{Bytes: nil}},
 
-	{"required", Unmarshaler{}, bson.D{{"str", "hello"}}, &pb.MsgWithRequired{Str: proto.String("hello")}},
-	{"required bytes", Unmarshaler{}, bson.D{{"byts", primitive.Binary{}}}, &pb.MsgWithRequiredBytes{Byts: []byte{}}},
+	{"required", UnmarshalOptions{}, bson.D{{"str", "hello"}}, &pb.MsgWithRequired{Str: proto.String("hello")}},
+	{"required bytes", UnmarshalOptions{}, bson.D{{"byts", primitive.Binary{}}}, &pb.MsgWithRequiredBytes{Byts: []byte{}}},
 }
 
 func TestUnmarshaling(t *testing.T) {
 	for _, tt := range unmarshalingTests {
-		if equal, err := compareUnmarshaled(tt.unmarshaler, tt.bson, tt.pb); err != nil || !equal {
+		if equal, err := compareUnmarshaled(tt.unmarshalOpts, tt.bson, tt.pb); err != nil || !equal {
 			t.Errorf("\n%s: %s\n", tt.desc, err.Error())
 		}
 	}
 }
 
-func compareUnmarshaled(um Unmarshaler, b bson.D, pb proto.Message) (bool, error) {
+func compareUnmarshaled(um UnmarshalOptions, b bson.D, pb proto.Message) (bool, error) {
 	observed := reflect.New(reflect.TypeOf(pb).Elem()).Interface().(proto.Message)
 
 	// Marshal to bson bytes first
+	/*
 	rawBson, mErr := bson.Marshal(b)
 	if mErr != nil {
 		return false, fmt.Errorf("marshaling bson to bytes failed: %v", mErr)
 	}
+	*/
 
 	// Now unmarshal to proto message
-	umErr := um.Unmarshal(rawBson, observed)
+	umErr := um.Unmarshal(b, observed)
 	if umErr != nil {
 		return false, fmt.Errorf("unmarshaling failed: %v", umErr)
 	}
@@ -367,14 +369,14 @@ func compareUnmarshaled(um Unmarshaler, b bson.D, pb proto.Message) (bool, error
 
 func TestUnmarshalNullArray(t *testing.T) {
 	var repeats pb.Repeats
-	if equal, err := compareUnmarshaled(Unmarshaler{}, bson.D{{"rBool", primitive.Null{}}}, &repeats); err != nil || !equal {
+	if equal, err := compareUnmarshaled(UnmarshalOptions{}, bson.D{{"rBool", primitive.Null{}}}, &repeats); err != nil || !equal {
 		t.Errorf("\n%s: %s\n", t.Name, err.Error())
 	}
 }
 
 func TestUnmarshalNullObject(t *testing.T) {
 	var maps pb.Maps
-	if equal, err := compareUnmarshaled(Unmarshaler{}, bson.D{{"mInt64Str", primitive.Null{}}}, &maps); err != nil || !equal {
+	if equal, err := compareUnmarshaled(UnmarshalOptions{}, bson.D{{"mInt64Str", primitive.Null{}}}, &maps); err != nil || !equal {
 		t.Errorf("\n%s: %s\n", t.Name, err.Error())
 	}
 }
@@ -459,7 +461,7 @@ var unmarshalingShouldError = []struct {
 
 func TestUnmarshalingBadInput(t *testing.T) {
 	for _, tt := range unmarshalingShouldError {
-		if _, err := compareUnmarshaled(Unmarshaler{}, tt.in, tt.pb); err == nil {
+		if _, err := compareUnmarshaled(UnmarshalOptions{}, tt.in, tt.pb); err == nil {
 			t.Errorf("an error was expected when parsing %q instead of an object", tt.desc)
 		}
 	}
@@ -521,7 +523,7 @@ func TestAnyWithCustomResolver(t *testing.T) {
 		t.Errorf("marshaling BSON produced incorrect output: \ngot %v\nwanted %v", marshaled, wanted)
 	}
 
-	u := Unmarshaler{AnyResolver: resolver}
+	u := UnmarshalOptions{AnyResolver: resolver}
 	equal, umErr := compareUnmarshaled(u, marshaled.(bson.D), any)
 	if umErr != nil {
 		t.Errorf(umErr.Error())
@@ -550,7 +552,7 @@ func TestUnmarshalBSONPBUnmarshaler(t *testing.T) {
 	}
 
 	// Now unmarshal to proto message
-	umErr := (&Unmarshaler{}).Unmarshal(rawBson, &msg)
+	umErr := (&UnmarshalOptions{}).Unmarshal(rawBson, &msg)
 	if umErr != nil {
 		t.Errorf("unmarshaling failed: %v", umErr)
 		return
@@ -578,7 +580,7 @@ func TestUnmarshalNullWithBSONPBUnmarshaler(t *testing.T) {
 		return
 	}
 
-	umErr := (&Unmarshaler{}).Unmarshal(rawBson, &ptrFieldMsg)
+	umErr := (&UnmarshalOptions{}).Unmarshal(rawBson, &ptrFieldMsg)
 	if umErr != nil {
 		t.Errorf("unmarshaling failed: %v", umErr)
 		return
@@ -613,7 +615,7 @@ func TestUnmarshalAnyBSONPBUnmarshaler(t *testing.T) {
 		return
 	}
 
-	umErr := (&Unmarshaler{}).Unmarshal(rawAny, &got)
+	umErr := (&UnmarshalOptions{}).Unmarshal(rawAny, &got)
 	if umErr != nil {
 		t.Errorf("unmarshaling failed: %v", umErr)
 		return
@@ -737,7 +739,7 @@ func TestUnmarshalUnsetRequiredFields(t *testing.T) {
 		},
 	}
 
-	um := Unmarshaler{}
+	um := UnmarshalOptions{}
 	for _, tc := range tests {
 		b, mErr := bson.Marshal(tc.bson)
 		if mErr != nil {

@@ -271,7 +271,7 @@ func (s *stringField) String() string {
 func (s *stringField) ProtoMessage() {
 }
 
-func (s *stringField) UnmarshalBSONPB(jum *Unmarshaler, js []byte) error {
+func (s *stringField) UnmarshalBSONPB(dec *decoder, js []byte) error {
 	s.IsSet = true
 	s.StringValue = string(js)
 	return nil
@@ -308,7 +308,7 @@ func (m *dynamicMessage) MarshalBSONPB(jm *Marshaler) (interface{}, error) {
 	return out, nil
 }
 
-func (m *dynamicMessage) UnmarshalBSONPB(jum *Unmarshaler, data bson.M) error {
+func (m *dynamicMessage) UnmarshalBSONPB(dec *decoder, data bson.M) error {
 	b, err := bson.Marshal(data)
 	if err != nil {
 		return err
