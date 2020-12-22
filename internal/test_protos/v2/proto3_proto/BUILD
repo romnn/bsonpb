@@ -18,6 +18,6 @@ go_proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//internal/test_protos/v2/proto2_proto:test_go_proto",
-        "@com_github_golang_protobuf//ptypes/any:go_default_library",
+        "@org_golang_google_protobuf//types/known/anypb:go_default_library",
     ],
 )

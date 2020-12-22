@@ -1,22 +1,22 @@
 package bsonpb
 
 import (
-	"unicode/utf8"
+	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"reflect"
+	"strconv"
 	"strings"
-	"errors"
+	"unicode/utf8"
 
 	"github.com/lunemec/as"
 	"github.com/romnnn/bsonpb/v2/internal/genid"
-	"google.golang.org/protobuf/proto"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsonrw"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"google.golang.org/protobuf/proto"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Unmarshal reads the given bson.D into the given proto.Message.
@@ -76,7 +76,7 @@ func (o UnmarshalOptions) unmarshal(doc interface{}, m proto.Message) error {
 	if o.Resolver == nil {
 		o.Resolver = protoregistry.GlobalTypes
 	}
-	
+
 	dec := decoder{o}
 	if err := dec.unmarshalMessage(doc, m.ProtoReflect(), false); err != nil {
 		return err
@@ -102,12 +102,12 @@ func (d decoder) unmarshalMessage(doc interface{}, m pref.Message, skipTypeURL b
 	if (isNullPrimitive || doc == nil) && m.Descriptor().FullName() == genid.Value_message_fullname {
 		return nil
 	}
-	
+
 	messageDesc := m.Descriptor()
 	if !protoLegacy && IsMessageSet(messageDesc) {
 		return errors.New("no support for proto1 MessageSets")
 	}
-	
+
 	var seenNums Ints
 	var seenOneofs Ints
 	fieldDescs := messageDesc.Fields()
@@ -137,10 +137,10 @@ func (d decoder) unmarshalMessage(doc interface{}, m pref.Message, skipTypeURL b
 			// The name can either be the JSON name or the proto field name.
 			fd = fieldDescs.ByJSONName(name)
 			/*
-			// TODO: Coming in v1.25+
-			if fd == nil {
-				fd = fieldDescs.ByTextName(name)
-			}
+				// TODO: Coming in v1.25+
+				if fd == nil {
+					fd = fieldDescs.ByTextName(name)
+				}
 			*/
 			if fd == nil {
 				fd = fieldDescs.ByName(pref.Name(name))
@@ -237,7 +237,7 @@ func (d decoder) unmarshalMap(doc bson.D, mmap pref.Map, fd pref.FieldDescriptor
 		}
 	}
 
-	for _ , item := range doc {
+	for _, item := range doc {
 		name := item.Key
 		val := item.Value
 		// Unmarshal field name.
@@ -368,7 +368,6 @@ func (d decoder) unmarshalScalar(doc interface{}, fd pref.FieldDescriptor) (pref
 		if docType.Kind() == reflect.Bool {
 			return pref.ValueOfBool(vdoc.Bool()), nil
 		}
-
 
 	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
 		switch docType.Kind() {

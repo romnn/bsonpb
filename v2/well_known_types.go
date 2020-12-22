@@ -2,19 +2,19 @@ package bsonpb
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"strconv"
 	"reflect"
-	"unicode/utf8"
+	"strconv"
 	"strings"
 	"time"
-	"errors"
+	"unicode/utf8"
 
 	"github.com/romnnn/bsonpb/v2/internal/genid"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"google.golang.org/protobuf/proto"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type marshalFunc func(encoder, pref.Message) (interface{}, error)
@@ -155,7 +155,7 @@ func (e encoder) marshalAny(m pref.Message) (interface{}, error) {
 	}
 
 	result = append(result, marshaled...)
-	
+
 	return result, nil
 }
 
@@ -444,7 +444,7 @@ func isValidDuration(secs, nanos int64) (bool, error) {
 		return false, fmt.Errorf("%s: nanos out of range %v", genid.Duration_message_fullname, nanos)
 	}
 	if (secs > 0 && nanos < 0) || (secs < 0 && nanos > 0) {
-		return false,  fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
+		return false, fmt.Errorf("%s: signs of seconds and nanos do not match", genid.Duration_message_fullname)
 	}
 	return true, nil
 }
@@ -458,7 +458,7 @@ func (e encoder) marshalDuration(m pref.Message) (interface{}, error) {
 	nanosVal := m.Get(fdNanos)
 	secs := secsVal.Int()
 	nanos := nanosVal.Int()
-	
+
 	if _, err := isValidDuration(secs, nanos); err != nil {
 		return bson.D{}, err
 	}
@@ -481,22 +481,22 @@ func (d decoder) unmarshalDuration(val interface{}, m pref.Message) error {
 	var secs, nanos int64
 	if seconds, ok := dur.Map()["Seconds"]; ok {
 		switch reflect.TypeOf(seconds).Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				secs = reflect.ValueOf(seconds).Int()
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				secs = int64(reflect.ValueOf(seconds).Uint())
-			default:
-				return fmt.Errorf("invalid google.protobuf.Duration seconds: %v (want int64 but got %T)", quoted(seconds), seconds)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			secs = reflect.ValueOf(seconds).Int()
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			secs = int64(reflect.ValueOf(seconds).Uint())
+		default:
+			return fmt.Errorf("invalid google.protobuf.Duration seconds: %v (want int64 but got %T)", quoted(seconds), seconds)
 		}
 	}
 	if nanoseconds, ok := dur.Map()["Nanos"]; ok {
 		switch reflect.TypeOf(nanoseconds).Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				nanos = int64(reflect.ValueOf(nanoseconds).Int())
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				nanos = int64(reflect.ValueOf(nanoseconds).Uint())
-			default:
-				return fmt.Errorf("invalid google.protobuf.Duration nanoseconds: %v (want int32 but got %T)", quoted(nanoseconds), nanoseconds)
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			nanos = int64(reflect.ValueOf(nanoseconds).Int())
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			nanos = int64(reflect.ValueOf(nanoseconds).Uint())
+		default:
+			return fmt.Errorf("invalid google.protobuf.Duration nanoseconds: %v (want int32 but got %T)", quoted(nanoseconds), nanoseconds)
 		}
 	}
 
@@ -656,7 +656,7 @@ func (e encoder) marshalTimestamp(m pref.Message) (interface{}, error) {
 	nanosVal := m.Get(fdNanos)
 	secs := int64(secsVal.Int())
 	nanos := int64(nanosVal.Int())
-	
+
 	if _, err := isValidTimestamp(secs, nanos); err != nil {
 		return bson.D{}, err
 	}
@@ -708,7 +708,7 @@ func (e encoder) marshalFieldMask(m pref.Message) (interface{}, error) {
 			return nil, fmt.Errorf("%s contains irreversible value %q", genid.FieldMask_Paths_field_fullname, s)
 		}
 		paths = append(paths, cc)
-	}	
+	}
 	return paths, nil
 }
 

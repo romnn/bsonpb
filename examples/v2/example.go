@@ -2,9 +2,9 @@ package main
 
 import (
 	pb "github.com/romnnn/bsonpb/internal/testprotos/v2/proto3_proto"
-	"google.golang.org/protobuf/proto"
-	log "github.com/sirupsen/logrus"
 	"github.com/romnnn/bsonpb/v2"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {

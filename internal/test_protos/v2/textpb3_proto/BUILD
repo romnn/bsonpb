@@ -6,8 +6,6 @@ proto_library(
     srcs = ["test.proto"],
     visibility = ["//visibility:public"],
     deps = [
-        # "@com_google_protobuf//:any_proto",
-        # "//internal/test_protos/v2/proto2_proto:test_proto",
     ],
 )
 
@@ -17,7 +15,5 @@ go_proto_library(
     proto = ":test_proto",
     visibility = ["//visibility:public"],
     deps = [
-        # "//internal/test_protos/v2/proto2_proto:test_go_proto",
-        # "@com_github_golang_protobuf//ptypes/any:go_default_library",
     ],
 )

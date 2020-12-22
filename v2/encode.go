@@ -1,21 +1,21 @@
 package bsonpb
 
 import (
-	"unicode/utf8"
+	"errors"
 	"fmt"
 	"sort"
-	"errors"
+	"unicode/utf8"
 
 	"github.com/romnnn/bsonpb/v2/internal/genid"
-	"google.golang.org/protobuf/proto"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"google.golang.org/protobuf/proto"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
-	protoLegacy = false
+	protoLegacy   = false
 	defaultIndent = "  "
 	extensionName = "message_set_extension"
 )
@@ -264,11 +264,11 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) (inter
 	case pref.EnumKind:
 		if fd.Enum().FullName() == genid.NullValue_enum_fullname {
 			return primitive.Null{}, nil
-		} 
+		}
 		desc := fd.Enum().Values().ByNumber(val.Enum())
 		if e.opts.UseEnumNumbers || desc == nil {
 			return int64(val.Enum()), nil
-		} 
+		}
 		return string(desc.Name()), nil
 
 	case pref.MessageKind, pref.GroupKind:

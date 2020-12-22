@@ -15,21 +15,16 @@ go_library(
         "//internal/test_protos/v2/bsonpb_proto:test_proto3_go_proto",
         "//internal/test_protos/v2/proto3_proto:test_go_proto",
         "//v2/internal/genid:go_default_library",
-        # Proto
-        # "@org_golang_google_protobuf//encoding/protojson:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",
         "@org_golang_google_protobuf//reflect/protoregistry:go_default_library",
         "@org_golang_google_protobuf//runtime/protoimpl:go_default_library",
-        # Well known types
         "@org_golang_google_protobuf//types/known/timestamppb:go_default_library",
         "@org_golang_google_protobuf//types/known/durationpb:go_default_library",
         "@org_golang_google_protobuf//types/known/anypb:go_default_library",
         "@org_golang_google_protobuf//types/known/structpb:go_default_library",
         "@org_golang_google_protobuf//types/known/wrapperspb:go_default_library",
         "@org_golang_google_protobuf//types/known/emptypb:go_default_library",
-        # "@org_golang_google_protobuf//types/known/fieldmaskpb:go_default_library",
-        # Other
         "@com_github_lunemec_as//:go_default_library",
         "@org_mongodb_go_mongo_driver//bson:go_default_library",
         "@org_mongodb_go_mongo_driver//bson/bsonrw:go_default_library",

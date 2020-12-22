@@ -7,7 +7,6 @@ gazelle(name = "gazelle")
 test_suite(
     name = "go_default_test",
     tests = [
-        "//v1:go_default_test",
         "//v2:go_default_test",
     ]
 )
