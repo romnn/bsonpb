@@ -34,7 +34,7 @@ log.Infof("Marshaled: %v", marshaled)
 ###### Unmarshaling
 
 ```golang
-import "github.com/romnnn/bsonbp/v2"
+import "github.com/romnnn/bsonpb/v2"
 
 var myProto pb.Message
 inputBson := bson.D{{Key: "Name", Value: "Test"}}
