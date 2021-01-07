@@ -12,7 +12,7 @@ This package allows to serialize/deserialize golang `protobuf` messages into/fro
 - This implementation has transitioned from the old [github.com/golang/protobuf](https://github.com/golang/protobuf) to the new [google.golang.org/protobuf](https://github.com/protocolbuffers/protobuf-go) API. The v1 implementation had various bazel related conflicts with the protobug dependency and is now abandoned under the `v1` branch.
 
 ```go
-import "github.com/romnnn/bsonbp/v2" // only works with google.golang.org/protobuf, NOT github.com/golang/protobuf
+import "github.com/romnnn/bsonpb/v2" // only works with google.golang.org/protobuf, NOT github.com/golang/protobuf
 ```
 
 #### Usage (v2)
@@ -20,7 +20,7 @@ import "github.com/romnnn/bsonbp/v2" // only works with google.golang.org/protob
 ###### Marshaling
 
 ```golang
-import "github.com/romnnn/bsonbp/v2"
+import "github.com/romnnn/bsonpb/v2"
 
 myProto := &pb.Message{Name: "Test", Hilarity: pb.Message_SLAPSTICK}
 opts := bsonpb.MarshalOptions{}
@@ -34,7 +34,7 @@ log.Infof("Marshaled: %v", marshaled)
 ###### Unmarshaling
 
 ```golang
-import "github.com/romnnn/bsonbp/v2"
+import "github.com/romnnn/bsonpb/v2"
 
 var myProto pb.Message
 inputBson := bson.D{{Key: "Name", Value: "Test"}}
