@@ -1,10 +1,10 @@
 ## bsonpb
 
-[![Build Status](https://travis-ci.com/romnnn/bsonpb.svg?branch=master)](https://travis-ci.com/romnnn/bsonpb)
-[![GitHub](https://img.shields.io/github/license/romnnn/bsonpb)](https://github.com/romnnn/bsonpb)
-[![GoDoc](https://godoc.org/github.com/romnnn/bsonpb?status.svg)](https://godoc.org/github.com/romnnn/bsonpb)
-[![Test Coverage](https://codecov.io/gh/romnnn/bsonpb/branch/master/graph/badge.svg)](https://codecov.io/gh/romnnn/bsonpb)
-[![Release](https://img.shields.io/github/v/release/romnnn/bsonpb)](https://github.com/romnnn/bsonpb/releases/latest)
+[![Build Status](https://travis-ci.com/romnn/bsonpb.svg?branch=master)](https://travis-ci.com/romnn/bsonpb)
+[![GitHub](https://img.shields.io/github/license/romnn/bsonpb)](https://github.com/romnn/bsonpb)
+[![GoDoc](https://godoc.org/github.com/romnn/bsonpb?status.svg)](https://godoc.org/github.com/romnn/bsonpb)
+[![Test Coverage](https://codecov.io/gh/romnn/bsonpb/branch/master/graph/badge.svg)](https://codecov.io/gh/romnn/bsonpb)
+[![Release](https://img.shields.io/github/v/release/romnn/bsonpb)](https://github.com/romnn/bsonpb/releases/latest)
 
 This package allows to serialize/deserialize golang `protobuf` messages into/from `bson` documents.
 
@@ -12,7 +12,7 @@ This package allows to serialize/deserialize golang `protobuf` messages into/fro
 - This implementation has transitioned from the old [github.com/golang/protobuf](https://github.com/golang/protobuf) to the new [google.golang.org/protobuf](https://github.com/protocolbuffers/protobuf-go) API. The v1 implementation had various bazel related conflicts with the protobug dependency and is now abandoned under the `v1` branch.
 
 ```go
-import "github.com/romnnn/bsonpb/v2" // only works with google.golang.org/protobuf, NOT github.com/golang/protobuf
+import "github.com/romnn/bsonpb/v2" // only works with google.golang.org/protobuf, NOT github.com/golang/protobuf
 ```
 
 #### Usage (v2)
@@ -20,7 +20,7 @@ import "github.com/romnnn/bsonpb/v2" // only works with google.golang.org/protob
 ###### Marshaling
 
 ```golang
-import "github.com/romnnn/bsonpb/v2"
+import "github.com/romnn/bsonpb/v2"
 
 myProto := &pb.Message{Name: "Test", Hilarity: pb.Message_SLAPSTICK}
 opts := bsonpb.MarshalOptions{}
@@ -34,7 +34,7 @@ log.Infof("Marshaled: %v", marshaled)
 ###### Unmarshaling
 
 ```golang
-import "github.com/romnnn/bsonpb/v2"
+import "github.com/romnn/bsonpb/v2"
 
 var myProto pb.Message
 inputBson := bson.D{{Key: "Name", Value: "Test"}}

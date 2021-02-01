@@ -8,12 +8,9 @@ go_library(
         "decode.go",
         "encode.go",
     ],
-    importpath = "github.com/romnnn/bsonpb/v2",
+    importpath = "github.com/romnn/bsonpb/v2",
     visibility = ["//visibility:public"],
     deps = [
-        "//internal/test_protos/v2/bsonpb_proto:test_proto2_go_proto",
-        "//internal/test_protos/v2/bsonpb_proto:test_proto3_go_proto",
-        "//internal/test_protos/v2/proto3_proto:test_go_proto",
         "//v2/internal/genid:go_default_library",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",
@@ -35,7 +32,7 @@ go_library(
 TEST_DEPS = [
     "@com_github_google_go_cmp//cmp:go_default_library",
     "@org_golang_google_protobuf//testing/protopack:go_default_library",
-    "@com_github_romnnn_deepequal//:go_default_library",
+    "@com_github_romnn_deepequal//:go_default_library",
     "//internal/test_protos/v2/textpb2_proto:test_go_proto",
     "//internal/test_protos/v2/textpb3_proto:test_go_proto",
 ]

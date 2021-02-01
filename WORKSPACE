@@ -39,13 +39,12 @@ load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 protobuf_deps()
 
 go_repository(
-    name = "com_github_romnnn_deepequal",
-    importpath = "github.com/romnnn/deepequal",
-    sum = "h1:UXnTzW6gXkguwf/N6M0lxrEKn2VOMclaQGTLBqPE9zI=",
+    name = "com_github_romnn_deepequal",
+    importpath = "github.com/romnn/deepequal",
+    sum = "h1:UKMbE0OWvM00kF9OIIo9KreQVeC7Bt8mX0d1Da32kNc=",
     version = "v0.0.0-20200304130557-0992d7d478a0",
 )
 
-# v1.3.4 is the last v1 version
 go_repository(
     name = "org_mongodb_go_mongo_driver",
     importpath = "go.mongodb.org/mongo-driver",

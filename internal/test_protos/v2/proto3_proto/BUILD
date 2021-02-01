@@ -13,7 +13,7 @@ proto_library(
 
 go_proto_library(
     name = "test_go_proto",
-    importpath = "github.com/romnnn/bsonpb/internal/testprotos/v2/proto3_proto",
+    importpath = "github.com/romnn/bsonpb/internal/testprotos/v2/proto3_proto",
     proto = ":test_proto",
     visibility = ["//visibility:public"],
     deps = [

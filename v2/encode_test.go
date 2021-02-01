@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/romnnn/deepequal"
+	"github.com/romnn/deepequal"
 
 	"google.golang.org/protobuf/proto"
 	preg "google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/testing/protopack"
 
-	pb2 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb2_proto"
-	pb3 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb3_proto"
+	pb2 "github.com/romnn/bsonpb/internal/testprotos/v2/textpb2_proto"
+	pb3 "github.com/romnn/bsonpb/internal/testprotos/v2/textpb3_proto"
 
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"

@@ -19,7 +19,7 @@ go_library(
         "wrappers.go",
         "wrappers_gen.go",
     ],
-    importpath = "github.com/romnnn/bsonpb/v2/internal/genid",
+    importpath = "github.com/romnn/bsonpb/v2/internal/genid",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",

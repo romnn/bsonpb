@@ -1,8 +1,8 @@
 package main
 
 import (
-	pb "github.com/romnnn/bsonpb/internal/testprotos/v2/proto3_proto"
-	"github.com/romnnn/bsonpb/v2"
+	pb "github.com/romnn/bsonpb/internal/testprotos/v2/proto3_proto"
+	"github.com/romnn/bsonpb/v2"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )

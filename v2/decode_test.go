@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	preg "google.golang.org/protobuf/reflect/protoregistry"
 
-	pb2 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb2_proto"
-	pb3 "github.com/romnnn/bsonpb/internal/testprotos/v2/textpb3_proto"
+	pb2 "github.com/romnn/bsonpb/internal/testprotos/v2/textpb2_proto"
+	pb3 "github.com/romnn/bsonpb/internal/testprotos/v2/textpb3_proto"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -2390,36 +2390,8 @@ func TestUnmarshal(t *testing.T) {
 			wantMessage: &anypb.Any{
 				TypeUrl: "type.googleapis.com/google.protobuf.Empty",
 			},
-		}, /* {
-			desc:         "weak fields",
-			inputMessage: &testpb.TestWeak{},
-			inputBson:    bson.D{
-				{Key: "weak_message1", Value: bson.D{
-					{Key: "a", Value: 1},
-				}},
-			},
-			wantMessage: func() *testpb.TestWeak {
-				m := new(testpb.TestWeak)
-				m.SetWeakMessage1(&weakpb.WeakImportMessage1{A: proto.Int32(1)})
-				return m
-			}(),
-			skip: !protoLegacy,
-		}, {
-			desc:         "weak fields; unknown field",
-			inputMessage: &testpb.TestWeak{},
-			inputBson:    bson.D{
-				{Key: "weak_message1", Value: bson.D{
-					{Key: "a", Value: 1},
-				}},
-				{Key: "weak_message2", Value: bson.D{
-					{Key: "a", Value: 1},
-				}},
-			},
-			wantErr:      `unknown field "weak_message2"`, // weak_message2 is unknown since the package containing it is not imported
-			skip:         !protoLegacy,
-		}*/
+		},
 	}
-
 	for _, tt := range tests {
 		tt := tt
 		if tt.skip {

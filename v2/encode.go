@@ -6,7 +6,7 @@ import (
 	"sort"
 	"unicode/utf8"
 
-	"github.com/romnnn/bsonpb/v2/internal/genid"
+	"github.com/romnn/bsonpb/v2/internal/genid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"google.golang.org/protobuf/proto"

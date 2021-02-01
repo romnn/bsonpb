@@ -1,0 +1,40 @@
+on: [push, pull_request]
+
+name: test
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: 1.15.x
+
+    - name: install code check tools
+      run: |
+        go get -u golang.org/x/lint/golint
+        go get -u github.com/fzipp/gocyclo/cmd/gocyclo
+        go get -u github.com/mitchellh/gox
+        # do not change go.mod and go.sum
+        git checkout go.mod go.sum
+    
+    - name: code checks
+      uses: pre-commit/action@v2.0.0
+      with:
+        extra_args: --all-files
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: romnnn/setup-bazel-action@master
+      with:
+        version: 3.7.2
+
+    - name: build
+      run: |
+        bazel build //...:*
+    - name: test
+      run: |
+        bazel test --show_result=0 --noshow_progress --noshow_loading_progress --logging=0 //...:*
