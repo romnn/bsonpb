@@ -41,8 +41,8 @@ protobuf_deps()
 go_repository(
     name = "com_github_romnn_deepequal",
     importpath = "github.com/romnn/deepequal",
-    sum = "h1:UKMbE0OWvM00kF9OIIo9KreQVeC7Bt8mX0d1Da32kNc=",
-    version = "v0.0.0-20200304130557-0992d7d478a0",
+    sum = "h1:EPrCg4JRVbyyZfms/ET2tV5Px/bUvLuR+tviDJLL0rg=",
+    version = "v0.0.2",
 )
 
 go_repository(
